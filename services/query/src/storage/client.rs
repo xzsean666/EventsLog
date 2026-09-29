@@ -29,6 +29,79 @@ pub struct FunctionFilter {
     pub limit: Option<usize>,
 }
 
+/// Deserializes a u64 from either a JSON integer or a JSON string.
+pub fn deserialize_u64_flexible<'de, D>(deserializer: D) -> Result<u64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    struct U64Visitor;
+    impl<'de> serde::de::Visitor<'de> for U64Visitor {
+        type Value = u64;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a u64 integer or numeric string")
+        }
+
+        fn visit_u64<E>(self, value: u64) -> Result<u64, E> {
+            Ok(value)
+        }
+
+        fn visit_i64<E>(self, value: i64) -> Result<u64, E>
+        where
+            E: serde::de::Error,
+        {
+            if value >= 0 {
+                Ok(value as u64)
+            } else {
+                Err(E::custom("negative integer for u64"))
+            }
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<u64, E>
+        where
+            E: serde::de::Error,
+        {
+            value.parse::<u64>().map_err(E::custom)
+        }
+    }
+    deserializer.deserialize_any(U64Visitor)
+}
+
+/// Deserializes an f64 from either a JSON float, integer, or numeric string.
+pub fn deserialize_f64_flexible<'de, D>(deserializer: D) -> Result<f64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    struct F64Visitor;
+    impl<'de> serde::de::Visitor<'de> for F64Visitor {
+        type Value = f64;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a float or numeric string")
+        }
+
+        fn visit_f64<E>(self, value: f64) -> Result<f64, E> {
+            Ok(value)
+        }
+
+        fn visit_u64<E>(self, value: u64) -> Result<f64, E> {
+            Ok(value as f64)
+        }
+
+        fn visit_i64<E>(self, value: i64) -> Result<f64, E> {
+            Ok(value as f64)
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<f64, E>
+        where
+            E: serde::de::Error,
+        {
+            value.parse::<f64>().map_err(E::custom)
+        }
+    }
+    deserializer.deserialize_any(F64Visitor)
+}
+
 /// Aggregated function summary row.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FunctionSummary {
@@ -41,16 +114,17 @@ pub struct FunctionSummary {
     #[serde(default)]
     pub class_name: Option<String>,
     pub function_name: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_u64_flexible")]
     pub call_count: u64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_u64_flexible")]
     pub total_executions: u64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_u64_flexible")]
     pub error_count: u64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_u64_flexible")]
     pub total_errors: u64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_f64_flexible")]
     pub avg_duration_ms: f64,
+    #[serde(deserialize_with = "eventslog_schema::deserialize_datetime_flexible")]
     pub last_seen: DateTime<Utc>,
 }
 
@@ -81,7 +155,10 @@ pub struct ClickHouseStorageClient {
 impl ClickHouseStorageClient {
     /// Constructs a new ClickHouseStorageClient pointing to the ClickHouse HTTP endpoint.
     pub fn new(base_url: &str) -> Self {
-        let endpoint = format!("{}/?log_queries=0", base_url.trim_end_matches('/'));
+        let endpoint = format!(
+            "{}/?log_queries=0&output_format_json_quote_64bit_integers=0",
+            base_url.trim_end_matches('/')
+        );
         let client = Client::builder()
             .timeout(Duration::from_secs(15))
             .pool_max_idle_per_host(16)

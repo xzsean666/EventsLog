@@ -1,9 +1,34 @@
--- Migration 001: Initial Schema for EventsLog
--- Creates database eventslog and primary tables for telemetry ingestion
+#!/usr/bin/env bash
+set -euo pipefail
 
-CREATE DATABASE IF NOT EXISTS eventslog;
+# ==============================================================================
+# EventsLog Real-World End-to-End Simulation & Verification Runner
+# ==============================================================================
 
--- Table for observed function execution traces and metrics
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+echo "================================================================================"
+echo " Starting EventsLog Real-World End-to-End Verification Suite..."
+echo " Root directory: ${ROOT_DIR}"
+echo "================================================================================"
+
+# 1. Compile Rust backend services
+echo "--> [1/4] Compiling EventsLog Ingestion & Query services..."
+cargo build -p eventslog-ingestion -p eventslog-query --quiet
+
+# 2. Build SDK packages
+echo "--> [2/4] Building SDK packages (@eventslog/node, @eventslog/browser)..."
+pnpm --filter @eventslog/node --filter @eventslog/browser run build > /dev/null
+
+# 3. Ensure ClickHouse Database & Schema are up to date
+echo "--> [3/4] Ensuring ClickHouse database and tables are provisioned..."
+CLICKHOUSE_URL="${CLICKHOUSE_URL:-http://eventlake:eventlake@127.0.0.1:8123}"
+
+# Execute migration statements
+curl -s -f -X POST "${CLICKHOUSE_URL}/" --data-binary "CREATE DATABASE IF NOT EXISTS eventslog;" > /dev/null
+
+curl -s -f -X POST "${CLICKHOUSE_URL}/" --data-binary "
 CREATE TABLE IF NOT EXISTS eventslog.function_executions (
     event_id String,
     trace_id String,
@@ -37,8 +62,9 @@ SETTINGS index_granularity = 8192,
          parts_to_delay_insert = 300,
          parts_to_throw_insert = 600,
          max_delay_to_insert = 1;
+" > /dev/null
 
--- Table for generic event envelopes and raw logs
+curl -s -f -X POST "${CLICKHOUSE_URL}/" --data-binary "
 CREATE TABLE IF NOT EXISTS eventslog.events (
     event_id String,
     trace_id String,
@@ -58,4 +84,15 @@ SETTINGS index_granularity = 8192,
          parts_to_delay_insert = 300,
          parts_to_throw_insert = 600,
          max_delay_to_insert = 1;
+" > /dev/null
 
+echo "    [OK] ClickHouse schema ready."
+
+# 4. Run Real-World E2E Suite
+cd "${ROOT_DIR}/tests/e2e"
+pnpm run build
+CLICKHOUSE_URL="${CLICKHOUSE_URL}" node dist/index.js
+
+echo "================================================================================"
+echo " REAL-WORLD E2E VERIFICATION SUITE COMPLETED SUCCESSFULLY!"
+echo "================================================================================"

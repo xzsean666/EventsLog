@@ -7,4 +7,4 @@ pub mod convert;
 pub mod models;
 
 pub use convert::SchemaError;
-pub use models::{EventRow, ExecutionRow};
+pub use models::{deserialize_datetime_flexible, EventRow, ExecutionRow};

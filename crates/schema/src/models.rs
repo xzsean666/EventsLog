@@ -1,6 +1,28 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+/// Deserializes a DateTime<Utc> from either standard RFC 3339 or ClickHouse DateTime64 text formats.
+pub fn deserialize_datetime_flexible<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    if let Ok(dt) = DateTime::parse_from_rfc3339(&s) {
+        return Ok(dt.with_timezone(&Utc));
+    }
+    if let Ok(naive) = chrono::NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S%.f") {
+        return Ok(DateTime::<Utc>::from_naive_utc_and_offset(naive, Utc));
+    }
+    if let Ok(naive) = chrono::NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S") {
+        return Ok(DateTime::<Utc>::from_naive_utc_and_offset(naive, Utc));
+    }
+    if let Ok(naive) = chrono::NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%S%.f") {
+        return Ok(DateTime::<Utc>::from_naive_utc_and_offset(naive, Utc));
+    }
+
+    Err(serde::de::Error::custom(format!("failed to parse timestamp: {s}")))
+}
+
 /// Flat ClickHouse storage model for raw generic events.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EventRow {
@@ -21,6 +43,7 @@ pub struct EventRow {
     /// Raw serialized payload JSON string.
     pub payload_json: String,
     /// Timestamp of event in UTC.
+    #[serde(deserialize_with = "deserialize_datetime_flexible")]
     pub timestamp: DateTime<Utc>,
 }
 
@@ -69,5 +92,6 @@ pub struct ExecutionRow {
     /// Serialized attributes/tags JSON string.
     pub attributes_json: String,
     /// Timestamp of execution start or completion in UTC.
+    #[serde(deserialize_with = "deserialize_datetime_flexible")]
     pub timestamp: DateTime<Utc>,
 }

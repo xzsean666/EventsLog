@@ -67,56 +67,58 @@ export class BrowserBatchBuffer {
     }
 
     this.isFlushing = true;
-    const batch = useBeacon
-      ? this.queue.splice(0, Math.min(this.queue.length, 200))
-      : this.queue.splice(0, this.batchSize);
 
     try {
-      const payload: BatchEventPayload = { events: batch };
-      const jsonBody = JSON.stringify(payload);
+      while (this.queue.length > 0) {
+        const batch = useBeacon
+          ? this.queue.splice(0, Math.min(this.queue.length, 200))
+          : this.queue.splice(0, this.batchSize);
 
-      let beaconEndpoint = this.endpoint;
-      if (this.apiKey) {
-        const delimiter = beaconEndpoint.includes('?') ? '&' : '?';
-        beaconEndpoint = `${beaconEndpoint}${delimiter}api_key=${encodeURIComponent(this.apiKey)}`;
-      }
+        const payload: BatchEventPayload = { events: batch };
+        const jsonBody = JSON.stringify(payload);
 
-      if (useBeacon && typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
-        const blob = new Blob([jsonBody], { type: 'application/json' });
-        const sent = navigator.sendBeacon(beaconEndpoint, blob);
-        if (sent) {
-          this.isFlushing = false;
-          return;
+        let beaconEndpoint = this.endpoint;
+        if (this.apiKey) {
+          const delimiter = beaconEndpoint.includes('?') ? '&' : '?';
+          beaconEndpoint = `${beaconEndpoint}${delimiter}api_key=${encodeURIComponent(this.apiKey)}`;
         }
-      }
 
-      // Standard HTTP fetch transport with keepalive for high reliability
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        ...this.customHeaders,
-      };
+        if (useBeacon && typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+          const blob = new Blob([jsonBody], { type: 'application/json' });
+          const sent = navigator.sendBeacon(beaconEndpoint, blob);
+          if (sent) {
+            break;
+          }
+        }
 
-      if (this.apiKey) {
-        headers['X-API-Key'] = this.apiKey;
-      }
+        // Standard HTTP fetch transport with keepalive for high reliability
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+          ...this.customHeaders,
+        };
 
-      if (typeof fetch !== 'undefined') {
-        await fetch(this.endpoint, {
-          method: 'POST',
-          headers,
-          body: jsonBody,
-          keepalive: true,
-          mode: 'cors',
-        });
+        if (this.apiKey) {
+          headers['X-API-Key'] = this.apiKey;
+        }
+
+        if (typeof fetch !== 'undefined') {
+          await fetch(this.endpoint, {
+            method: 'POST',
+            headers,
+            body: jsonBody,
+            keepalive: true,
+            mode: 'cors',
+          });
+        }
+
+        if (useBeacon) {
+          break;
+        }
       }
     } catch {
       // Non-intrusive: never crash client host application
     } finally {
       this.isFlushing = false;
-      // If remaining events accumulated, flush again
-      if (this.queue.length >= this.batchSize) {
-        void this.flush();
-      }
     }
   }
 

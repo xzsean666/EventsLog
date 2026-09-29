@@ -14,8 +14,9 @@
     "pnpm": ">=9.0.0"
   },
   "scripts": {
-    "build": "pnpm -r --filter=!./examples/** run build",
-    "test": "pnpm -r run test",
+    "build": "pnpm -r --filter=!./examples/** --filter=!./tests/** run build",
+    "test": "pnpm -r --filter=!./tests/** run test",
+    "test:e2e": "./scripts/run_real_world_e2e.sh",
     "lint": "pnpm -r run lint"
   }
 }

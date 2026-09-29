@@ -4,7 +4,7 @@ use eventslog_common::ApiError;
 use serde::{Deserialize, Serialize};
 
 use crate::router::AppState;
-use crate::storage::client::escape_sql_string;
+use crate::storage::client::{deserialize_f64_flexible, deserialize_u64_flexible, escape_sql_string};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct StatsQuery {
@@ -32,15 +32,15 @@ pub struct StatsEnvelope {
 
 #[derive(Debug, Clone, Deserialize)]
 struct RawStatsRow {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_u64_flexible")]
     total_executions: u64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_u64_flexible")]
     total_errors: u64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_f64_flexible")]
     p50_duration_ms: f64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_f64_flexible")]
     p95_duration_ms: f64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_f64_flexible")]
     p99_duration_ms: f64,
 }
 

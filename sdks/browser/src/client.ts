@@ -5,7 +5,7 @@ import {
   Attributes,
   createExecutionError,
 } from './protocol/types';
-import { BrowserContextManager, defaultContextManager, generateEventId } from './tracing/context';
+import { BrowserContextManager, defaultContextManager, generateEventId, SpanContext } from './tracing/context';
 import { BrowserSanitizer } from './sanitization/sanitizer';
 import { BrowserBatchBuffer } from './transport/buffer';
 import { GlobalErrorInterceptor } from './interceptors/errors';
@@ -107,6 +107,13 @@ export class EventsLogBrowserClient {
 
   recordEvent(event: Event): void {
     this.buffer.enqueue(event);
+  }
+
+  /**
+   * Retrieves the currently active span context in the browser execution flow.
+   */
+  getCurrentSpan(): SpanContext | undefined {
+    return this.contextManager.getCurrentSpan();
   }
 
   /**

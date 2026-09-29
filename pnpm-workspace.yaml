@@ -3,9 +3,12 @@ packages:
   - "dashboard"
   - "packages/*"
   - "examples/*"
+  - "tests/*"
 
 allowBuilds:
+  "@nestjs/core": true
   esbuild: true
 
 onlyBuiltDependencies:
+  - "@nestjs/core"
   - esbuild

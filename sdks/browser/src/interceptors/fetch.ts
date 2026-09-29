@@ -82,19 +82,24 @@ export class FetchInterceptor {
       }
 
       const method = init?.method?.toUpperCase() || (typeof input === 'object' && 'method' in input ? input.method : 'GET') || 'GET';
-      const childSpan = self.contextManager.createChildSpan();
 
       let modifiedInit = init;
+      let childSpan: ReturnType<typeof self.contextManager.createChildSpan>;
+
       // Only inject trace propagation headers if URL is allowed or same-origin
       if (self.shouldPropagateTrace(urlString)) {
         const mergedHeaders = new Headers(
           init?.headers || (typeof input === 'object' && 'headers' in input ? input.headers : undefined)
         );
+        const explicitTraceId = mergedHeaders.get('x-trace-id') || undefined;
+        childSpan = self.contextManager.createChildSpan(explicitTraceId);
         self.contextManager.injectTraceHeaders(mergedHeaders, childSpan);
         modifiedInit = {
           ...init,
           headers: mergedHeaders,
         };
+      } else {
+        childSpan = self.contextManager.createChildSpan();
       }
 
       const startTime = typeof performance !== 'undefined' ? performance.now() : Date.now();

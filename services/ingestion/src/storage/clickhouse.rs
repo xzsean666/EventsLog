@@ -9,7 +9,7 @@ use tracing::{error, warn};
 
 /// Standard query parameter string enforcing ClickHouse production optimization blueprint.
 pub const OPTIMIZED_QUERY_PARAMS: &str =
-    "async_insert=1&wait_for_async_insert=1&async_insert_busy_timeout_ms=200&log_queries=0";
+    "async_insert=1&wait_for_async_insert=1&async_insert_busy_timeout_ms=200&log_queries=0&date_time_input_format=best_effort";
 
 /// Errors encountered while persisting event batches to ClickHouse.
 #[derive(Debug, Error)]

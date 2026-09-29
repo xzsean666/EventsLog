@@ -2,32 +2,37 @@ import { BrowserConfig, Attributes } from './protocol/types';
 import { EventsLogBrowserClient } from './client';
 import { defaultContextManager } from './tracing/context';
 
-let globalClient: EventsLogBrowserClient | undefined;
+declare global {
+  // eslint-disable-next-line no-var
+  var __EVENTSLOG_BROWSER_CLIENT__: EventsLogBrowserClient | undefined;
+}
 
 /**
  * Initializes the EventsLog Browser SDK with the provided configuration.
  */
 export function init(config: BrowserConfig): EventsLogBrowserClient {
-  if (globalClient) {
-    globalClient.destroy();
+  if (globalThis.__EVENTSLOG_BROWSER_CLIENT__) {
+    globalThis.__EVENTSLOG_BROWSER_CLIENT__.destroy();
   }
-  globalClient = new EventsLogBrowserClient(config);
-  return globalClient;
+  const client = new EventsLogBrowserClient(config);
+  globalThis.__EVENTSLOG_BROWSER_CLIENT__ = client;
+  return client;
 }
 
 /**
  * Returns the currently active global EventsLog browser client.
  */
 export function getClient(): EventsLogBrowserClient | undefined {
-  return globalClient;
+  return globalThis.__EVENTSLOG_BROWSER_CLIENT__;
 }
 
 /**
  * Executes a function within a new traced span.
  */
 export function startSpan<T>(name: string, fn: () => T, attributes?: Attributes): T {
-  if (globalClient) {
-    return globalClient.startSpan(name, fn, attributes);
+  const client = getClient();
+  if (client) {
+    return client.startSpan(name, fn, attributes);
   }
   return fn();
 }
@@ -36,8 +41,9 @@ export function startSpan<T>(name: string, fn: () => T, attributes?: Attributes)
  * Executes an async function within a new traced span.
  */
 export async function traceAsync<T>(name: string, fn: () => Promise<T>, attributes?: Attributes): Promise<T> {
-  if (globalClient) {
-    return globalClient.traceAsync(name, fn, attributes);
+  const client = getClient();
+  if (client) {
+    return client.traceAsync(name, fn, attributes);
   }
   return fn();
 }
@@ -46,8 +52,9 @@ export async function traceAsync<T>(name: string, fn: () => Promise<T>, attribut
  * Wraps a function so every invocation is automatically tracked.
  */
 export function wrapFunction<F extends (...args: any[]) => any>(fn: F, name?: string): F {
-  if (globalClient) {
-    return globalClient.wrapFunction(fn, name);
+  const client = getClient();
+  if (client) {
+    return client.wrapFunction(fn, name);
   }
   return fn;
 }
@@ -56,8 +63,9 @@ export function wrapFunction<F extends (...args: any[]) => any>(fn: F, name?: st
  * Manually captures an error and transmits it to EventsLog.
  */
 export function captureError(error: unknown, attributes?: Attributes): void {
-  if (globalClient) {
-    globalClient.captureError(error, attributes);
+  const client = getClient();
+  if (client) {
+    client.captureError(error, attributes);
   }
 }
 
@@ -65,8 +73,9 @@ export function captureError(error: unknown, attributes?: Attributes): void {
  * Flushes all pending buffered events immediately.
  */
 export async function flush(): Promise<void> {
-  if (globalClient) {
-    await globalClient.flush();
+  const client = getClient();
+  if (client) {
+    await client.flush();
   }
 }
 

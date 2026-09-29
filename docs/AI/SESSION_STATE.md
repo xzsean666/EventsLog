@@ -1,54 +1,61 @@
 # Session State
 
 - **Current Goal**: Zero-Code Function Observability Platform (EventsLog)
-- **Current Task**: TASK-029 (Comprehensive System Hardening & Optimization: Security, Performance, and Contract Alignment)
+- **Current Task**: TASK-030 (Comprehensive Real-World End-to-End Simulation & Verification: React, Vue, NestJS, Ingestion, ClickHouse, and Query Services)
 - **Current Status**: DONE
 - **Completed Work**:
-  - Remediated all critical, high, and medium audit findings across backend services, ClickHouse schema, and SDKs.
-  - Fixed schema conversion in `crates/schema/src/convert.rs`: properly preserves `EventPayload::Error` and error events with status `error`, `error_type`, `error_message`, and `error_stack` in ClickHouse.
-  - Aligned Dashboard and Query API contract in `services/query/src/handlers/functions.rs`: added composite `function_id` (`service:module:function`) parsing in `list_function_executions`.
-  - Added `allowedTracingOrigins` to Browser SDK (`FetchInterceptor` and `BrowserConfig`): guarantees distributed trace propagation headers (`x-trace-id`, `x-span-id`, `traceparent`) are only injected into same-origin or configured endpoints, eliminating third-party API CORS preflight failures.
-  - Hardened Browser Data Sanitizer (`BrowserSanitizer`): added guards for `Window`, `Document`, `Node`, `Event` and safe property traversal via `Object.getOwnPropertyNames` with property-level exception isolation.
-  - Protected Promise rejection capture in `GlobalErrorInterceptor` against circular structure stringification crashes.
-  - Enhanced Browser Transport Buffer (`BrowserBatchBuffer`): drains all queued events on page unload, appends `api_key` query parameter for beacon transport, and cleanly unregisters event listeners in `destroy()`.
-  - Upgraded Vue Router tracking (`trackVueRouter`): accurately measures navigation duration between `beforeEach` and `afterEach`.
-  - Hardened Node.js SDK instrumentation: refined `isClass` to avoid misclassifying functions with static helpers, copied static properties onto wrapped functions, and safely wrapped `capturePayload` in try-catch to guarantee zero business execution disruption.
-  - Hardened authentication timing attack defense: implemented true constant-time comparison across all byte lengths in `services/ingestion` and `services/query`, and supported `?api_key=` URL query parameter fallback for beacon transport.
-  - Optimized Query API trace response: eliminated duplicate `root_spans` tree clone, avoiding 4x JSON serialization payload inflation.
-  - Enhanced ClickHouse migration schema with Bloom filter skipping indices for `span_id` and `event_id`.
-  - Verified full test suite across workspace:
+  - Implemented real-world end-to-end simulation suite under `tests/e2e/` verifying authentic production environments:
+    - **Live ClickHouse Storage**: Corrected TTL definition in ClickHouse migrations (`toDateTime(timestamp) + INTERVAL 30 DAY`) for ClickHouse 24.8 compatibility and verified Bloom filter skipping indices.
+    - **Native Rust Ingestion Service**: Added `date_time_input_format=best_effort` parameter to support ISO-8601 timestamps with 'Z' suffix directly into ClickHouse `DateTime64(6, 'UTC')`.
+    - **Native Rust Query Service**: Added flexible deserializers for `u64`, `f64`, and ClickHouse `DateTime` formats to handle ClickHouse unquoted and quoted numeric output seamlessly without schema mismatches.
+    - **Node.js SDK (`@eventslog/node`)**: Preserved Reflect metadata (`Reflect.getMetadataKeys(fn)`) across wrapped functions in `wrapFunction`, preventing metadata loss on NestJS decorators (`@Get`, `@Post`, `@Body`, `@Param`, etc.).
+    - **Browser SDK (`@eventslog/browser`)**: Maintained singleton state across bundled submodules (`@eventslog/browser/react` and `@eventslog/browser/vue`) via `globalThis.__EVENTSLOG_BROWSER_CLIENT__`, preserved caller-supplied `x-trace-id` headers in `FetchInterceptor`, and drained all queued events during batch buffer flush.
+    - **NestJS Application Tier**: Created full-featured e-commerce backend with `AppModule`, `OrderController`, `OrderService`, `InventoryService`, `PaymentService`, and `@eventslog/node` instrumentation.
+    - **React Frontend Client**: Tested `CheckoutWorkflow` with `FetchInterceptor` distributed tracing, custom spans, and `EventsLogErrorBoundary` component crash capture.
+    - **Vue 3 Frontend Client**: Tested Vue Router SPA navigation latency tracking, `createEventsLogVue` global error handler, and cross-tier error propagation from NestJS.
+    - **High-Concurrency Stress Testing**: Verified 25 concurrent parallel clients with zero trace context bleeding or pollution across `AsyncLocalStorage` contexts.
+    - **End-to-End Automated Runner**: Created `scripts/run_real_world_e2e.sh` which provisions ClickHouse tables, starts Ingestion (8094) and Query (8095), executes React, Vue, NestJS, and concurrency flows, and asserts 6 rigorous verification checks.
+  - Verified 100% passing across all verification checks and test suites:
+    - `./scripts/run_real_world_e2e.sh` -> All 6 verification checks passed (Catalog, Executions, 6-level distributed trace reconstruction, 0 sensitive leaks with 567+ redactions, React Error Boundary & Vue Error Handler persistence, NestJS error status tracking).
     - `cargo test --workspace` -> 48 tests passed (100%).
-    - `pnpm -r run test` -> 78 tests passed across 15 test files (100%).
+    - `pnpm -r run test` -> 80 tests passed across all packages including `@eventslog/e2e-real-world` (100%).
     - `pnpm -C dashboard test` -> 9 tests passed (100%).
-    - `pnpm run build` -> successfully compiled `@eventslog/browser`, `@eventslog/node`, and `dashboard`.
 - **Modified / Created Files**:
-  - `crates/schema/src/convert.rs`
-  - `services/ingestion/src/auth.rs`
-  - `services/query/src/auth.rs`
-  - `services/query/src/handlers/functions.rs`
-  - `services/query/src/handlers/traces.rs`
   - `storage/clickhouse/migrations/001_initial_schema.sql`
-  - `sdks/browser/src/protocol/types.ts`
-  - `sdks/browser/src/client.ts`
-  - `sdks/browser/src/interceptors/fetch.ts`
-  - `sdks/browser/src/interceptors/errors.ts`
-  - `sdks/browser/src/sanitization/sanitizer.ts`
-  - `sdks/browser/src/transport/buffer.ts`
-  - `sdks/browser/src/vue/index.ts`
-  - `sdks/browser/tests/interceptors.test.ts`
-  - `sdks/browser/tests/sanitizer.test.ts`
-  - `sdks/node/src/instrumentation/patcher.ts`
+  - `services/ingestion/src/storage/clickhouse.rs`
+  - `crates/schema/src/models.rs`
+  - `crates/schema/src/lib.rs`
+  - `services/query/src/storage/client.rs`
+  - `services/query/src/handlers/stats.rs`
   - `sdks/node/src/instrumentation/wrapper.ts`
-  - `sdks/node/tests/instrumentation.test.ts`
-  - `docs/AI/tasks/TASK-029.md` (created)
+  - `sdks/browser/src/interceptors/fetch.ts`
+  - `sdks/browser/src/transport/buffer.ts`
+  - `sdks/browser/src/client.ts`
+  - `sdks/browser/src/index.ts`
+  - `tests/e2e/package.json`
+  - `tests/e2e/tsconfig.json`
+  - `tests/e2e/src/nestjs/module.ts`
+  - `tests/e2e/src/nestjs/controllers.ts`
+  - `tests/e2e/src/nestjs/services.ts`
+  - `tests/e2e/src/nestjs/eventslog.ts`
+  - `tests/e2e/src/nestjs/server.ts`
+  - `tests/e2e/src/react/CheckoutApp.ts`
+  - `tests/e2e/src/vue/StoreApp.ts`
+  - `tests/e2e/src/concurrency.ts`
+  - `tests/e2e/src/orchestrator.ts`
+  - `tests/e2e/src/index.ts`
+  - `scripts/run_real_world_e2e.sh`
+  - `package.json`
+  - `pnpm-workspace.yaml`
+  - `docs/AI/tasks/TASK-030.md`
   - `docs/AI/TASK_INDEX.md`
   - `docs/AI/SESSION_STATE.md`
 - **Executed Verification Commands & Results**:
+  - `./scripts/run_real_world_e2e.sh` -> 6/6 checks passed with 100% success
   - `cargo test --workspace` -> 48 passed; 0 failed
-  - `pnpm -r run test` -> 78 passed; 0 failed
+  - `pnpm -r run test` -> 80 passed; 0 failed
   - `pnpm -C dashboard test` -> 9 passed; 0 failed
-  - `pnpm run build` -> cleanly compiled all packages
 - **Unresolved Issues**: None
 - **Risks & Assumptions**:
-  - When deploying ClickHouse migration update to existing clusters, run `ALTER TABLE eventslog.function_executions ADD INDEX idx_span span_id TYPE bloom_filter(0.01) GRANULARITY 1, ADD INDEX idx_event event_id TYPE bloom_filter(0.01) GRANULARITY 1;` followed by `ALTER TABLE ... MATERIALIZE INDEX idx_span, MATERIALIZE INDEX idx_event;` on historical partitions.
-- **Next Task to Execute**: None (TASK-029 Milestone 10 hardening complete)
+  - Requires ClickHouse 24.8+ running on `127.0.0.1:8123` with user `eventlake:eventlake` when executing `./scripts/run_real_world_e2e.sh`.
+- **Next Task to Execute**: All currently indexed milestones and tasks (Milestones 1 through 11, TASK-001 to TASK-030) are successfully completed.

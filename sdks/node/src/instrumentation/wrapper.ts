@@ -181,6 +181,19 @@ export function wrapFunction<T extends (...args: any[]) => any>(
     }
   }
 
+  // Preserve Reflect metadata (NestJS decorators, Angular, TypeORM, etc.)
+  if (typeof (Reflect as any)?.getMetadataKeys === 'function') {
+    try {
+      const metaKeys = (Reflect as any).getMetadataKeys(fn);
+      for (const key of metaKeys) {
+        const val = (Reflect as any).getMetadata(key, fn);
+        (Reflect as any).defineMetadata(key, val, wrapped);
+      }
+    } catch {
+      // Reflection copying failure should never disrupt execution
+    }
+  }
+
   return wrapped as unknown as T;
 }
 

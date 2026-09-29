@@ -44,3 +44,5 @@ State Machine: `TODO` -> `IN_PROGRESS` -> `REVIEW` -> `DONE` (or `BLOCKED`).
 | [TASK-028](tasks/TASK-028.md) | Browser SDK Implementation with React & Vue Integrations | DONE | TASK-027 | `sdks/browser` & `services/ingestion` |
 | **Milestone 10: Full-Stack Audit Remediation & Hardening** | | | | |
 | [TASK-029](tasks/TASK-029.md) | Comprehensive System Hardening & Optimization: Security, Performance, and Contract Alignment | DONE | TASK-028 | Cross-System |
+| **Milestone 11: Real-World End-to-End Simulation & Verification** | | | | |
+| [TASK-030](tasks/TASK-030.md) | Comprehensive Real-World End-to-End Simulation & Verification (React, Vue, NestJS, Ingestion, ClickHouse, and Query Services) | DONE | TASK-029 | End-to-End / Cross-System |
