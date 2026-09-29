@@ -68,6 +68,7 @@ pub fn create_router_with_buffer(config: ServerConfig, buffer: Arc<BatchBuffer>)
     Router::new()
         .route("/health", get(health_check))
         .route("/v1/events", post(ingest_events))
+        .route("/v1/events/batch", post(ingest_events))
         .layer(cors)
         .layer(DefaultBodyLimit::max(10 * 1024 * 1024)) // 10MB request payload limit
         .with_state(state)

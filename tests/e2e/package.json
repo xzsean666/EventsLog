@@ -5,11 +5,14 @@
   "description": "Comprehensive Real-World End-to-End Simulation & Verification for EventsLog",
   "scripts": {
     "build": "tsc",
-    "test": "node dist/index.js"
+    "test": "node dist/index.js",
+    "test:flutter": "node dist/flutter_e2e.js"
   },
   "dependencies": {
     "@eventslog/browser": "workspace:*",
+    "@eventslog/flutter": "workspace:*",
     "@eventslog/node": "workspace:*",
+
     "@nestjs/common": "^10.3.8",
     "@nestjs/core": "^10.3.8",
     "@nestjs/platform-express": "^10.3.8",

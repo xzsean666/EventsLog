@@ -46,3 +46,10 @@ State Machine: `TODO` -> `IN_PROGRESS` -> `REVIEW` -> `DONE` (or `BLOCKED`).
 | [TASK-029](tasks/TASK-029.md) | Comprehensive System Hardening & Optimization: Security, Performance, and Contract Alignment | DONE | TASK-028 | Cross-System |
 | **Milestone 11: Real-World End-to-End Simulation & Verification** | | | | |
 | [TASK-030](tasks/TASK-030.md) | Comprehensive Real-World End-to-End Simulation & Verification (React, Vue, NestJS, Ingestion, ClickHouse, and Query Services) | DONE | TASK-029 | End-to-End / Cross-System |
+| **Milestone 12: Mobile Client Observability (Flutter / Dart)** | | | | |
+| [TASK-031](tasks/TASK-031.md) | Flutter / Dart Client SDK & AST Instrumentation CLI (Source-Level Zero-Code) | DONE | TASK-003, TASK-016, TASK-030 | `sdks/flutter` & `examples/flutter` |
+| [TASK-032](tasks/TASK-032.md) | Flutter / Dart Full-Stack End-to-End Simulation & Verification | DONE | TASK-007, TASK-011, TASK-014, TASK-031 | `tests/e2e`, `examples/flutter`, Cross-System |
+
+
+
+

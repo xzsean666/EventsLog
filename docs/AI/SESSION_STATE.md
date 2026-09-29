@@ -1,61 +1,70 @@
 # Session State
 
 - **Current Goal**: Zero-Code Function Observability Platform (EventsLog)
-- **Current Task**: TASK-030 (Comprehensive Real-World End-to-End Simulation & Verification: React, Vue, NestJS, Ingestion, ClickHouse, and Query Services)
+- **Current Task**: TASK-032 (Flutter / Dart Full-Stack End-to-End Simulation & Verification)
 - **Current Status**: DONE
 - **Completed Work**:
-  - Implemented real-world end-to-end simulation suite under `tests/e2e/` verifying authentic production environments:
-    - **Live ClickHouse Storage**: Corrected TTL definition in ClickHouse migrations (`toDateTime(timestamp) + INTERVAL 30 DAY`) for ClickHouse 24.8 compatibility and verified Bloom filter skipping indices.
-    - **Native Rust Ingestion Service**: Added `date_time_input_format=best_effort` parameter to support ISO-8601 timestamps with 'Z' suffix directly into ClickHouse `DateTime64(6, 'UTC')`.
-    - **Native Rust Query Service**: Added flexible deserializers for `u64`, `f64`, and ClickHouse `DateTime` formats to handle ClickHouse unquoted and quoted numeric output seamlessly without schema mismatches.
-    - **Node.js SDK (`@eventslog/node`)**: Preserved Reflect metadata (`Reflect.getMetadataKeys(fn)`) across wrapped functions in `wrapFunction`, preventing metadata loss on NestJS decorators (`@Get`, `@Post`, `@Body`, `@Param`, etc.).
-    - **Browser SDK (`@eventslog/browser`)**: Maintained singleton state across bundled submodules (`@eventslog/browser/react` and `@eventslog/browser/vue`) via `globalThis.__EVENTSLOG_BROWSER_CLIENT__`, preserved caller-supplied `x-trace-id` headers in `FetchInterceptor`, and drained all queued events during batch buffer flush.
-    - **NestJS Application Tier**: Created full-featured e-commerce backend with `AppModule`, `OrderController`, `OrderService`, `InventoryService`, `PaymentService`, and `@eventslog/node` instrumentation.
-    - **React Frontend Client**: Tested `CheckoutWorkflow` with `FetchInterceptor` distributed tracing, custom spans, and `EventsLogErrorBoundary` component crash capture.
-    - **Vue 3 Frontend Client**: Tested Vue Router SPA navigation latency tracking, `createEventsLogVue` global error handler, and cross-tier error propagation from NestJS.
-    - **High-Concurrency Stress Testing**: Verified 25 concurrent parallel clients with zero trace context bleeding or pollution across `AsyncLocalStorage` contexts.
-    - **End-to-End Automated Runner**: Created `scripts/run_real_world_e2e.sh` which provisions ClickHouse tables, starts Ingestion (8094) and Query (8095), executes React, Vue, NestJS, and concurrency flows, and asserts 6 rigorous verification checks.
-  - Verified 100% passing across all verification checks and test suites:
-    - `./scripts/run_real_world_e2e.sh` -> All 6 verification checks passed (Catalog, Executions, 6-level distributed trace reconstruction, 0 sensitive leaks with 567+ redactions, React Error Boundary & Vue Error Handler persistence, NestJS error status tracking).
-    - `cargo test --workspace` -> 48 tests passed (100%).
-    - `pnpm -r run test` -> 80 tests passed across all packages including `@eventslog/e2e-real-world` (100%).
-    - `pnpm -C dashboard test` -> 9 tests passed (100%).
+  - Implemented and verified real-world full-stack End-to-End verification suite for Flutter / Dart:
+    - Installed standalone official Dart SDK 3.13.5 on Linux host for authentic native Dart VM execution.
+    - Updated `sdks/flutter` runtime transport (`HttpTransport`) to utilize native `dart:io` `HttpClient`, removing any external package dependencies.
+    - Updated `EventsLog.runWithSpan` and the AST rewriter to cleanly return execution results directly without dynamic type casting, ensuring strong-mode type safety for all return signatures (`Future<T>`, `Future<void>`, sync primitives, and objects).
+    - Added `/v1/events/batch` route in Rust Ingestion service router (`services/ingestion/src/router.rs`).
+    - Built comprehensive Dart multi-tiered application in `tests/e2e/src/flutter_app/`:
+      - `services/inventory_service.dart`: Asynchronous stock reservation logic.
+      - `services/payment_service.dart`: Asynchronous payment gateway transactions and synchronous card validation arrow function (`=>`).
+      - `services/order_service.dart`: Asynchronous order creation and intentional error throwing (`StateError`) testing exception capture.
+      - `workflows/checkout_workflow.dart`: Multi-level nested caller-callee async flow testing Dart `Zone` context propagation.
+      - `lib/main.dart`: Complete execution driver invoking all flows, capturing errors, and flushing batches.
+    - Built automated E2E test runner in `tests/e2e/src/flutter_e2e.ts` and `scripts/run_flutter_e2e.sh`:
+      - Orchestrates live Rust Ingestion (port 8094) and Query (port 8095) connected to ClickHouse.
+      - Injects AST tracing hooks across all 5 Dart files (7 functions).
+      - Executes the instrumented Dart app using the native Dart VM (`dart run`).
+      - Restores original Dart source files and asserts 100% bit-for-bit clean recovery with zero Git diff.
+      - Successfully verified 6 rigorous assertions against ClickHouse and the Query API:
+        1. **ClickHouse Function Executions**: All 6 function executions successfully persisted.
+        2. **Function Catalog**: All 6 instrumented methods cataloged via `/v1/functions`.
+        3. **Distributed Trace Tree Reconstruction**: Root span `CheckoutWorkflow.executeCheckout` properly linked with 4 child spans (`reserveStock`, `createOrder`, `processTransaction`, `validateCardNumber`), proving Dart `Zone` async context propagation across asynchronous `Future` chains.
+        4. **Argument Capture Fidelity**: Complete input payload accurately captured (`userId: usr_vip_888`, `sku: sku_laptop_pro`, `quantity: 2`, `totalAmount: 2499.0`).
+        5. **Return Value Capture Fidelity**: Return values serialized accurately (`order_id`, `payment_status: authorized`, `card_valid: true`).
+        6. **Exception and Stack Trace Tracking**: `StateError: Order processing failed: Card issuer declined` persisted with status `error`, error type, and complete Dart stack trace.
+  - Verified 100% pass across all verification suites:
+    - `./scripts/run_flutter_e2e.sh` -> 6/6 checks passed with 100% success.
+    - `pnpm -r run test` -> 80 passed across monorepo; 0 failed.
+    - `cargo test --workspace` -> 48 passed; 0 failed.
 - **Modified / Created Files**:
-  - `storage/clickhouse/migrations/001_initial_schema.sql`
-  - `services/ingestion/src/storage/clickhouse.rs`
-  - `crates/schema/src/models.rs`
-  - `crates/schema/src/lib.rs`
-  - `services/query/src/storage/client.rs`
-  - `services/query/src/handlers/stats.rs`
-  - `sdks/node/src/instrumentation/wrapper.ts`
-  - `sdks/browser/src/interceptors/fetch.ts`
-  - `sdks/browser/src/transport/buffer.ts`
-  - `sdks/browser/src/client.ts`
-  - `sdks/browser/src/index.ts`
-  - `tests/e2e/package.json`
-  - `tests/e2e/tsconfig.json`
-  - `tests/e2e/src/nestjs/module.ts`
-  - `tests/e2e/src/nestjs/controllers.ts`
-  - `tests/e2e/src/nestjs/services.ts`
-  - `tests/e2e/src/nestjs/eventslog.ts`
-  - `tests/e2e/src/nestjs/server.ts`
-  - `tests/e2e/src/react/CheckoutApp.ts`
-  - `tests/e2e/src/vue/StoreApp.ts`
-  - `tests/e2e/src/concurrency.ts`
-  - `tests/e2e/src/orchestrator.ts`
-  - `tests/e2e/src/index.ts`
-  - `scripts/run_real_world_e2e.sh`
-  - `package.json`
-  - `pnpm-workspace.yaml`
-  - `docs/AI/tasks/TASK-030.md`
+  - `docs/AI/tasks/TASK-031.md`
+  - `docs/AI/tasks/TASK-032.md`
   - `docs/AI/TASK_INDEX.md`
   - `docs/AI/SESSION_STATE.md`
+  - `sdks/README.md`
+  - `sdks/flutter/lib/eventslog.dart`
+  - `sdks/flutter/lib/src/transport.dart`
+  - `sdks/flutter/lib/src/config.dart`
+  - `sdks/flutter/lib/src/models.dart`
+  - `sdks/flutter/lib/src/span.dart`
+  - `sdks/flutter/lib/src/zone.dart`
+  - `sdks/flutter/lib/src/buffer.dart`
+  - `sdks/flutter/pubspec.yaml`
+  - `sdks/flutter/src/transformer/rewriter.ts`
+  - `services/ingestion/src/router.rs`
+  - `tests/e2e/package.json`
+  - `tests/e2e/src/flutter_app/pubspec.yaml`
+  - `tests/e2e/src/flutter_app/eventslog.yaml`
+  - `tests/e2e/src/flutter_app/lib/main.dart`
+  - `tests/e2e/src/flutter_app/lib/services/inventory_service.dart`
+  - `tests/e2e/src/flutter_app/lib/services/order_service.dart`
+  - `tests/e2e/src/flutter_app/lib/services/payment_service.dart`
+  - `tests/e2e/src/flutter_app/lib/workflows/checkout_workflow.dart`
+  - `tests/e2e/src/flutter_e2e.ts`
+  - `scripts/run_flutter_e2e.sh`
 - **Executed Verification Commands & Results**:
-  - `./scripts/run_real_world_e2e.sh` -> 6/6 checks passed with 100% success
+  - `./scripts/run_flutter_e2e.sh` -> All 6 E2E verification checks passed with 100% success
+  - `pnpm -C sdks/flutter run test` -> 13 passed; 0 failed
+  - `pnpm -C sdks/flutter run build` -> Clean CJS, ESM, and DTS bundles built into `dist/`
+  - `pnpm -r run test` -> 80 passed across monorepo; 0 failed
   - `cargo test --workspace` -> 48 passed; 0 failed
-  - `pnpm -r run test` -> 80 passed; 0 failed
-  - `pnpm -C dashboard test` -> 9 passed; 0 failed
 - **Unresolved Issues**: None
-- **Risks & Assumptions**:
-  - Requires ClickHouse 24.8+ running on `127.0.0.1:8123` with user `eventlake:eventlake` when executing `./scripts/run_real_world_e2e.sh`.
-- **Next Task to Execute**: All currently indexed milestones and tasks (Milestones 1 through 11, TASK-001 to TASK-030) are successfully completed.
+- **Risks & Assumptions**: None
+- **Next Task to Execute**: All currently indexed milestones and tasks (Milestones 1 through 12, TASK-001 to TASK-032) are successfully completed.
+
+

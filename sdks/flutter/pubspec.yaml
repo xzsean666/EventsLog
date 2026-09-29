@@ -1,0 +1,13 @@
+name: eventslog_flutter
+description: Zero-Code Function Observability and Tracing SDK for Flutter and Dart applications.
+version: 0.1.0
+repository: https://github.com/xzsean666/EventsLog/tree/main/sdks/flutter
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  # Zero external dependencies - uses standard dart:io, dart:async, dart:convert
+
+dev_dependencies:
+  test: ^1.24.0

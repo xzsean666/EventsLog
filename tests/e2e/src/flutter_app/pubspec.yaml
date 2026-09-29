@@ -1,0 +1,10 @@
+name: flutter_e2e_app
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  eventslog_flutter:
+    path: ../../../../sdks/flutter

@@ -1,0 +1,12 @@
+eventslog:
+  service_name: "flutter-ecommerce-demo"
+  environment: "production"
+  endpoint: "http://localhost:8080/v1/events/batch"
+  batch_size: 50
+  flush_interval_ms: 500
+  capture_arguments: true
+  capture_returns: true
+  include:
+    - "lib/services/**"
+  exclude:
+    - "*_test.dart"

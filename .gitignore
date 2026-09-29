@@ -44,3 +44,8 @@ Thumbs.db
 coverage/
 *.lcov
 .nyc_output/
+
+# Flutter & Dart
+.dart_tool/
+.eventslog_backup/
+

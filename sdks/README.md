@@ -8,11 +8,13 @@ Each SDK is isolated to its target programming language ecosystem and must NOT m
 | Directory | Language / Ecosystem | Status | Description |
 | :--- | :--- | :--- | :--- |
 | [`node/`](node/) | Node.js (TypeScript / JavaScript) | **Active (Primary Target)** | Automatic zero-code instrumentation, async tracing, transport |
-| [`browser/`](browser/) | Browser (TypeScript / JavaScript) | Planned | Client-side web tracing & session observability |
+| [`browser/`](browser/) | Browser (TypeScript / JavaScript) | **Active** | Client-side web tracing & session observability |
+| [`flutter/`](flutter/) | Flutter / Dart | **Active** | Source-level AST instrumentation CLI & Dart runtime client |
 | [`python/`](python/) | Python (Python 3.9+) | Planned | Python function hooks, decorators, and WSGI/ASGI instrumentation |
 | [`go/`](go/) | Go (Go 1.22+) | Planned | Go runtime instrumentation & HTTP middleware |
 | [`java/`](java/) | Java (JVM / Java 17+) | Planned | Java agent byte-code manipulation |
 | [`rust/`](rust/) | Rust (Cargo) | Planned | Rust tracing subscriber & macro integration |
+
 
 ## Architectural Boundary & Functional Rules
 - **Universal Auto-Batching Engine**: All client SDKs must implement dual-trigger auto-batching:

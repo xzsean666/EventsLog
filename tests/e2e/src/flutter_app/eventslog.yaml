@@ -1,0 +1,12 @@
+eventslog:
+  service_name: "flutter-e2e-client"
+  environment: "staging"
+  endpoint: "http://127.0.0.1:8094/v1/events/batch"
+  batch_size: 50
+  flush_interval_ms: 50
+  capture_arguments: true
+  capture_returns: true
+  include:
+    - "lib/**"
+  exclude:
+    - "*_test.dart"
