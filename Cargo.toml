@@ -1,0 +1,50 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/protocol",
+    "crates/schema",
+    "crates/config",
+    "crates/common",
+    "services/ingestion",
+    "services/query",
+    "services/api",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["EventsLog Contributors"]
+license = "Apache-2.0"
+repository = "https://github.com/xzsean666/EventsLog"
+homepage = "https://github.com/xzsean666/EventsLog"
+
+[workspace.dependencies]
+# Serialization & Encoding
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+globset = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.10", features = ["v4", "serde"] }
+
+# Async runtime & Networking
+tokio = { version = "1.40", features = ["full"] }
+axum = { version = "0.7", features = ["macros"] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.5", features = ["cors", "trace", "compression-full"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+# Observability & Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Error Handling & Utilities
+thiserror = "1.0"
+anyhow = "1.0"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = true

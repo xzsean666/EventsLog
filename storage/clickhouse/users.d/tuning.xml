@@ -1,0 +1,19 @@
+<clickhouse>
+    <profiles>
+        <default>
+            <!-- Native asynchronous memory batching insertion -->
+            <async_insert>1</async_insert>
+            <!-- Wait for disk flush confirmation to preserve durability and checkpointing -->
+            <wait_for_async_insert>1</wait_for_async_insert>
+            <!-- Maximum window before flushing batch in ms -->
+            <async_insert_busy_timeout_ms>200</async_insert_busy_timeout_ms>
+            <!-- Maximum buffer size before flushing (10MB) -->
+            <async_insert_max_data_size>10485760</async_insert_max_data_size>
+            <!-- Do not log pipeline queries into system.query_log to prevent amplification -->
+            <log_queries>0</log_queries>
+            <parts_to_delay_insert>300</parts_to_delay_insert>
+            <parts_to_throw_insert>600</parts_to_throw_insert>
+            <max_delay_to_insert>1</max_delay_to_insert>
+        </default>
+    </profiles>
+</clickhouse>

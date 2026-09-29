@@ -1,0 +1,21 @@
+service_name: ecommerce-backend
+environment: staging
+
+batching:
+  max_batch_size: 10
+  flush_interval_ms: 100
+  max_queue_size: 1000
+
+instrumentation:
+  include:
+    - "*Service.*"
+    - "services/*:*"
+  exclude:
+    - "*.internalDebug"
+  sampling_rate: 1.0
+  sensitive_keys:
+    - "cardNumber"
+    - "cvv"
+    - "password"
+    - "secret"
+  max_payload_bytes: 65536

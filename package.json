@@ -1,0 +1,21 @@
+{
+  "name": "eventslog-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "EventsLog - Zero-Code Function Observability Platform",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xzsean666/EventsLog"
+  },
+  "packageManager": "pnpm@11.14.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter=!./examples/** run build",
+    "test": "pnpm -r run test",
+    "lint": "pnpm -r run lint"
+  }
+}

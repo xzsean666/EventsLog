@@ -1,0 +1,11 @@
+packages:
+  - "sdks/*"
+  - "dashboard"
+  - "packages/*"
+  - "examples/*"
+
+allowBuilds:
+  esbuild: true
+
+onlyBuiltDependencies:
+  - esbuild

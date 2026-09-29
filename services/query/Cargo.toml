@@ -1,0 +1,29 @@
+[package]
+name = "eventslog-query"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "High-performance query API service for EventsLog telemetry and dashboards"
+
+[dependencies]
+eventslog-protocol = { path = "../../crates/protocol" }
+eventslog-schema = { path = "../../crates/schema" }
+eventslog-config = { path = "../../crates/config" }
+eventslog-common = { path = "../../crates/common" }
+
+tokio = { workspace = true }
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+reqwest = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tower = { workspace = true, features = ["util"] }
+http-body-util = "0.1"
