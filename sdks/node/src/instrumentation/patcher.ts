@@ -3,6 +3,26 @@ import type { EventsLogConfig } from '../config/types.js';
 import { wrapFunction, type EventSink, type WrapOptions, IS_WRAPPED } from './wrapper.js';
 
 /**
+ * Determines whether a function is an ES6 class or constructor.
+ */
+export function isClass(fn: any): boolean {
+  if (typeof fn !== 'function') return false;
+  // Native/ES6 class detection
+  const str = Function.prototype.toString.call(fn);
+  if (/^\s*class(\s+|\{)/.test(str)) {
+    return true;
+  }
+  // Check prototype properties beyond constructor
+  if (fn.prototype) {
+    const protoProps = Object.getOwnPropertyNames(fn.prototype);
+    if (protoProps.length > 1) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Instruments methods declared on a class prototype and its static methods.
  */
 export function patchClass(
@@ -39,7 +59,7 @@ export function patchClass(
         const desc = Object.getOwnPropertyDescriptor(proto, prop);
         if (desc && typeof desc.value === 'function' && !desc.value[IS_WRAPPED]) {
           if (matcher.isObserved(moduleName, prop, className)) {
-            proto[prop] = wrapFunction(
+            const wrapped = wrapFunction(
               desc.value,
               {
                 module: moduleName,
@@ -48,6 +68,11 @@ export function patchClass(
               },
               wrapOptions
             );
+            if (desc.configurable) {
+              Object.defineProperty(proto, prop, { ...desc, value: wrapped });
+            } else {
+              proto[prop] = wrapped;
+            }
           }
         }
       } catch {
@@ -67,7 +92,7 @@ export function patchClass(
       const desc = Object.getOwnPropertyDescriptor(cls, prop);
       if (desc && typeof desc.value === 'function' && !desc.value[IS_WRAPPED]) {
         if (matcher.isObserved(moduleName, prop, className)) {
-          cls[prop] = wrapFunction(
+          const wrapped = wrapFunction(
             desc.value,
             {
               module: moduleName,
@@ -76,6 +101,11 @@ export function patchClass(
             },
             wrapOptions
           );
+          if (desc.configurable) {
+            Object.defineProperty(cls, prop, { ...desc, value: wrapped });
+          } else {
+            cls[prop] = wrapped;
+          }
         }
       }
     } catch {
@@ -118,7 +148,7 @@ export function patchObject(
 
       if (typeof desc.value === 'function' && !desc.value[IS_WRAPPED]) {
         if (matcher.isObserved(moduleName, prop, objectName)) {
-          obj[prop] = wrapFunction(
+          const wrapped = wrapFunction(
             desc.value,
             {
               module: moduleName,
@@ -127,6 +157,11 @@ export function patchObject(
             },
             wrapOptions
           );
+          if (desc.configurable) {
+            Object.defineProperty(obj, prop, { ...desc, value: wrapped });
+          } else {
+            obj[prop] = wrapped;
+          }
         }
       }
     } catch {
@@ -164,7 +199,7 @@ export function patchModule(
 
   // Case 1: module.exports is directly a class or function
   if (typeof moduleExports === 'function') {
-    if (moduleExports.prototype && Object.getOwnPropertyNames(moduleExports.prototype).length > 1) {
+    if (isClass(moduleExports)) {
       patchClass(moduleExports, moduleExports.name || 'AnonymousClass', moduleName, config, sink);
       return moduleExports;
     }
@@ -187,17 +222,27 @@ export function patchModule(
   if (typeof moduleExports === 'object') {
     for (const [key, value] of Object.entries(moduleExports)) {
       if (typeof value === 'function') {
-        if (value.prototype && Object.getOwnPropertyNames(value.prototype).length > 1) {
+        if (isClass(value)) {
           patchClass(value, key, moduleName, config, sink);
         } else if (!(value as any)[IS_WRAPPED] && matcher.isObserved(moduleName, key)) {
-          (moduleExports as any)[key] = wrapFunction(
-            value as any,
-            {
-              module: moduleName,
-              function_name: key,
-            },
-            wrapOptions
-          );
+          try {
+            const desc = Object.getOwnPropertyDescriptor(moduleExports, key);
+            const wrapped = wrapFunction(
+              value as any,
+              {
+                module: moduleName,
+                function_name: key,
+              },
+              wrapOptions
+            );
+            if (desc && desc.configurable) {
+              Object.defineProperty(moduleExports, key, { ...desc, value: wrapped });
+            } else {
+              (moduleExports as any)[key] = wrapped;
+            }
+          } catch {
+            // Ignore unconfigurable properties
+          }
         }
       }
     }
@@ -205,3 +250,4 @@ export function patchModule(
 
   return moduleExports;
 }
+

@@ -8,9 +8,13 @@ use tracing::info;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_tracing(LogFormat::Compact);
 
-    let mut config = ServerConfig::default();
-    config.port = 8081; // Query service runs on port 8081
-    config.service_name = "eventslog-query".to_string();
+    let mut config = ServerConfig::from_env();
+    if std::env::var("PORT").is_err() && std::env::var("EVENTSLOG_PORT").is_err() {
+        config.port = 8081; // Default Query service port
+    }
+    if config.service_name == "eventslog-service" {
+        config.service_name = "eventslog-query".to_string();
+    }
 
     let addr = config.socket_addr_str();
 

@@ -12,7 +12,10 @@ use tracing::info;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_tracing(LogFormat::Compact);
 
-    let config = ServerConfig::default();
+    let mut config = ServerConfig::from_env();
+    if config.service_name == "eventslog-service" {
+        config.service_name = "eventslog-ingestion".to_string();
+    }
     let addr = config.socket_addr_str();
 
     info!(

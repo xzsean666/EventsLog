@@ -7,6 +7,8 @@ use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
 
+use tower_http::cors::{Any, CorsLayer};
+
 use crate::buffer::{BatchBuffer, BatchBufferConfig, DropPolicy};
 use crate::handlers::ingest::ingest_events;
 
@@ -58,9 +60,15 @@ pub fn create_router_with_buffer(config: ServerConfig, buffer: Arc<BatchBuffer>)
         buffer,
     };
 
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any);
+
     Router::new()
         .route("/health", get(health_check))
         .route("/v1/events", post(ingest_events))
+        .layer(cors)
         .layer(DefaultBodyLimit::max(10 * 1024 * 1024)) // 10MB request payload limit
         .with_state(state)
 }

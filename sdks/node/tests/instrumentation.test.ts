@@ -211,4 +211,85 @@ describe('Instrumentation Engine & Method Wrapper', () => {
     expect(myModule.skip()).toBe('skipped');
     expect(events).toHaveLength(1);
   });
+
+  it('should safely preserve class constructor and patch static methods', () => {
+    const events: Event[] = [];
+    const sink = (e: Event) => events.push(e);
+
+    // Class with only static methods
+    class MathUtils {
+      static add(a: number, b: number) {
+        return a + b;
+      }
+    }
+
+    const testConfig: EventsLogConfig = {
+      ...DEFAULT_CONFIG,
+      instrumentation: {
+        ...DEFAULT_CONFIG.instrumentation,
+        include: ['MathUtils.*'],
+      },
+    };
+
+    const patched = patchModule(MathUtils, 'math_utils', testConfig, sink);
+
+    // Calling with `new` must NOT throw TypeError
+    expect(() => new patched()).not.toThrow();
+
+    // Calling static method must execute and record event
+    const sum = patched.add(10, 20);
+    expect(sum).toBe(30);
+    expect(events).toHaveLength(1);
+    expect((events[0].payload as any).data.function.function_name).toBe('add');
+  });
+
+  it('should instrument ordinary function with static helper methods without treating it as class', () => {
+    const events: Event[] = [];
+    const sink = (e: Event) => events.push(e);
+
+    function createOrder(orderId: string) {
+      return `created-${orderId}`;
+    }
+    createOrder.helper = (val: string) => `helper-${val}`;
+
+    const testConfig: EventsLogConfig = {
+      ...DEFAULT_CONFIG,
+      instrumentation: {
+        ...DEFAULT_CONFIG.instrumentation,
+        include: ['*'],
+      },
+    };
+
+    const patched = patchModule(createOrder, 'order_mod', testConfig, sink);
+
+    const res = patched('order_123');
+    expect(res).toBe('created-order_123');
+    expect(events).toHaveLength(1);
+    expect((events[0].payload as any).data.function.function_name).toBe('createOrder');
+    expect(patched.helper('test')).toBe('helper-test');
+  });
+
+  it('should not crash host application if input argument serialization throws', () => {
+    const events: Event[] = [];
+    const sink = (e: Event) => events.push(e);
+
+    const safeProcess = (_obj: any) => 'processed';
+    const wrapped = wrapFunction(
+      safeProcess,
+      { module: 'safe', function_name: 'safeProcess' },
+      { sink }
+    );
+
+    const evilArg: Record<string, unknown> = {};
+    Object.defineProperty(evilArg, 'boom', {
+      get() {
+        throw new Error('Getter crash');
+      },
+      enumerable: true,
+    });
+
+    expect(() => wrapped(evilArg)).not.toThrow();
+    expect(events).toHaveLength(1);
+  });
 });
+

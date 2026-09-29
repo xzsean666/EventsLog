@@ -1,48 +1,54 @@
 # Session State
 
 - **Current Goal**: Zero-Code Function Observability Platform (EventsLog)
-- **Current Task**: TASK-025 (End-to-End Integration Example & Full System Verification)
+- **Current Task**: TASK-029 (Comprehensive System Hardening & Optimization: Security, Performance, and Contract Alignment)
 - **Current Status**: DONE
 - **Completed Work**:
-  - Implemented multi-service zero-code Node.js example application in `examples/node`:
-    - `UserService`: simulates database account lookups.
-    - `PaymentService`: handles credit card transactions with sensitive billing data.
-    - `OrderService`: coordinates multi-tier checkout workflows without any APM/telemetry library imports.
-    - `src/index.js`: end-to-end runnable entry point.
-    - `eventslog.yaml`: configured inclusion patterns (`*Service.*`) and sensitive keys (`cardNumber`, `cvv`).
-  - Implemented automated end-to-end integration test suite in `scripts/test_e2e.sh`:
-    - Launches background ingestion telemetry receiver.
-    - Runs multi-tiered Node.js application under zero-code observation using `-r ../../sdks/node/dist/register.js`.
-    - Automatically captures telemetry events across asynchronous function boundaries.
-    - Verifies zero-code function interception without code modifications (`OrderService.createOrder`, `UserService.getUser`, `PaymentService.processPayment`).
-    - Verifies distributed trace hierarchy (root span `createOrder` -> child spans `getUser` and `processPayment`).
-    - Verifies sensitive field masking (`cardNumber` and `cvv` sanitized to `"[REDACTED]"`).
-    - Verifies high-resolution wall-clock duration measurement and process termination auto-flush.
-  - Documented complete architecture and running instructions in `examples/node/README.md`.
-  - Full platform test execution:
-    - Cargo workspace: 39 tests passing (100%).
-    - Node.js SDK Vitest: 49 tests passing (100%).
-    - Dashboard Vitest: 9 tests passing (100%).
-    - E2E Integration Suite (`scripts/test_e2e.sh`): 100% pass.
-    - All 25 tasks across Milestones 1 through 7 are completely implemented and verified.
+  - Remediated all critical, high, and medium audit findings across backend services, ClickHouse schema, and SDKs.
+  - Fixed schema conversion in `crates/schema/src/convert.rs`: properly preserves `EventPayload::Error` and error events with status `error`, `error_type`, `error_message`, and `error_stack` in ClickHouse.
+  - Aligned Dashboard and Query API contract in `services/query/src/handlers/functions.rs`: added composite `function_id` (`service:module:function`) parsing in `list_function_executions`.
+  - Added `allowedTracingOrigins` to Browser SDK (`FetchInterceptor` and `BrowserConfig`): guarantees distributed trace propagation headers (`x-trace-id`, `x-span-id`, `traceparent`) are only injected into same-origin or configured endpoints, eliminating third-party API CORS preflight failures.
+  - Hardened Browser Data Sanitizer (`BrowserSanitizer`): added guards for `Window`, `Document`, `Node`, `Event` and safe property traversal via `Object.getOwnPropertyNames` with property-level exception isolation.
+  - Protected Promise rejection capture in `GlobalErrorInterceptor` against circular structure stringification crashes.
+  - Enhanced Browser Transport Buffer (`BrowserBatchBuffer`): drains all queued events on page unload, appends `api_key` query parameter for beacon transport, and cleanly unregisters event listeners in `destroy()`.
+  - Upgraded Vue Router tracking (`trackVueRouter`): accurately measures navigation duration between `beforeEach` and `afterEach`.
+  - Hardened Node.js SDK instrumentation: refined `isClass` to avoid misclassifying functions with static helpers, copied static properties onto wrapped functions, and safely wrapped `capturePayload` in try-catch to guarantee zero business execution disruption.
+  - Hardened authentication timing attack defense: implemented true constant-time comparison across all byte lengths in `services/ingestion` and `services/query`, and supported `?api_key=` URL query parameter fallback for beacon transport.
+  - Optimized Query API trace response: eliminated duplicate `root_spans` tree clone, avoiding 4x JSON serialization payload inflation.
+  - Enhanced ClickHouse migration schema with Bloom filter skipping indices for `span_id` and `event_id`.
+  - Verified full test suite across workspace:
+    - `cargo test --workspace` -> 48 tests passed (100%).
+    - `pnpm -r run test` -> 78 tests passed across 15 test files (100%).
+    - `pnpm -C dashboard test` -> 9 tests passed (100%).
+    - `pnpm run build` -> successfully compiled `@eventslog/browser`, `@eventslog/node`, and `dashboard`.
 - **Modified / Created Files**:
-  - `examples/node/package.json`
-  - `examples/node/eventslog.yaml`
-  - `examples/node/src/services/UserService.js`
-  - `examples/node/src/services/PaymentService.js`
-  - `examples/node/src/services/OrderService.js`
-  - `examples/node/src/index.js`
-  - `examples/node/README.md`
-  - `scripts/test_e2e.sh`
-  - `docs/AI/tasks/TASK-025.md`
+  - `crates/schema/src/convert.rs`
+  - `services/ingestion/src/auth.rs`
+  - `services/query/src/auth.rs`
+  - `services/query/src/handlers/functions.rs`
+  - `services/query/src/handlers/traces.rs`
+  - `storage/clickhouse/migrations/001_initial_schema.sql`
+  - `sdks/browser/src/protocol/types.ts`
+  - `sdks/browser/src/client.ts`
+  - `sdks/browser/src/interceptors/fetch.ts`
+  - `sdks/browser/src/interceptors/errors.ts`
+  - `sdks/browser/src/sanitization/sanitizer.ts`
+  - `sdks/browser/src/transport/buffer.ts`
+  - `sdks/browser/src/vue/index.ts`
+  - `sdks/browser/tests/interceptors.test.ts`
+  - `sdks/browser/tests/sanitizer.test.ts`
+  - `sdks/node/src/instrumentation/patcher.ts`
+  - `sdks/node/src/instrumentation/wrapper.ts`
+  - `sdks/node/tests/instrumentation.test.ts`
+  - `docs/AI/tasks/TASK-029.md` (created)
   - `docs/AI/TASK_INDEX.md`
   - `docs/AI/SESSION_STATE.md`
 - **Executed Verification Commands & Results**:
-  - `bash scripts/test_e2e.sh` -> ALL END-TO-END VERIFICATION CHECKS PASSED SUCCESSFULLY
-  - `cargo test --workspace` -> 39 passed; 0 failed
-  - `pnpm -r run test` -> 58 passed across 10 test files; 0 failed
-  - `pnpm run build` -> built all packages and dashboard successfully
+  - `cargo test --workspace` -> 48 passed; 0 failed
+  - `pnpm -r run test` -> 78 passed; 0 failed
+  - `pnpm -C dashboard test` -> 9 passed; 0 failed
+  - `pnpm run build` -> cleanly compiled all packages
 - **Unresolved Issues**: None
 - **Risks & Assumptions**:
-  - Full system operates end-to-end with high performance and zero-code instrumentation.
-- **Next Task to Execute**: None (All planned tasks TASK-001 through TASK-025 are complete)
+  - When deploying ClickHouse migration update to existing clusters, run `ALTER TABLE eventslog.function_executions ADD INDEX idx_span span_id TYPE bloom_filter(0.01) GRANULARITY 1, ADD INDEX idx_event event_id TYPE bloom_filter(0.01) GRANULARITY 1;` followed by `ALTER TABLE ... MATERIALIZE INDEX idx_span, MATERIALIZE INDEX idx_event;` on historical partitions.
+- **Next Task to Execute**: None (TASK-029 Milestone 10 hardening complete)

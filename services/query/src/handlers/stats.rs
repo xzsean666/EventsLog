@@ -22,6 +22,14 @@ pub struct StatsResponse {
     pub p99_duration_ms: f64,
 }
 
+/// Wrapper providing both nested `{ stats: ... }` and flat fields for client compatibility.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StatsEnvelope {
+    pub stats: StatsResponse,
+    #[serde(flatten)]
+    pub direct: StatsResponse,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 struct RawStatsRow {
     #[serde(default)]
@@ -39,8 +47,9 @@ struct RawStatsRow {
 /// Handler for `GET /v1/stats`.
 pub async fn get_stats(
     State(state): State<AppState>,
+    _auth: crate::auth::AuthContext,
     Query(query): Query<StatsQuery>,
-) -> Result<Json<StatsResponse>, ApiError> {
+) -> Result<Json<StatsEnvelope>, ApiError> {
     let mut conditions = vec!["1 = 1".to_string()];
 
     if let Some(ref svc) = query.service_name {
@@ -87,12 +96,17 @@ pub async fn get_stats(
         0.0
     };
 
-    Ok(Json(StatsResponse {
+    let response = StatsResponse {
         total_executions: raw.total_executions,
         total_errors: raw.total_errors,
         error_rate,
         p50_duration_ms: raw.p50_duration_ms,
         p95_duration_ms: raw.p95_duration_ms,
         p99_duration_ms: raw.p99_duration_ms,
+    };
+
+    Ok(Json(StatsEnvelope {
+        stats: response.clone(),
+        direct: response,
     }))
 }

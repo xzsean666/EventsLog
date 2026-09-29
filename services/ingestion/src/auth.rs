@@ -11,25 +11,89 @@ pub struct AuthContext {
     pub client_key: String,
 }
 
+/// Constant-time byte-level comparison to prevent timing attacks against secret API keys.
+#[inline]
+pub fn constant_time_eq(a: &str, b: &str) -> bool {
+    let a_bytes = a.as_bytes();
+    let b_bytes = b.as_bytes();
+    let max_len = a_bytes.len().max(b_bytes.len());
+    let mut diff = (a_bytes.len() ^ b_bytes.len()) as u8;
+    for i in 0..max_len {
+        let x = a_bytes.get(i).copied().unwrap_or(0);
+        let y = b_bytes.get(i).copied().unwrap_or(0);
+        diff |= x ^ y;
+    }
+    diff == 0
+}
+
 impl AuthContext {
+    /// Validates request parts (headers and query params) against expected server API key.
+    pub fn validate_parts(parts: &Parts, expected_key: Option<&str>) -> Result<Self, ApiError> {
+        match expected_key {
+            Some(expected) => {
+                let key = extract_api_key(&parts.headers)
+                    .or_else(|| extract_query_api_key(parts.uri.query()))
+                    .ok_or_else(|| {
+                        ApiError::Unauthorized(
+                            "Missing API key header (x-api-key, Authorization: Bearer <key>, or ?api_key=<key>)".to_string(),
+                        )
+                    })?;
+
+                if !constant_time_eq(&key, expected) {
+                    return Err(ApiError::Unauthorized("Invalid API key".to_string()));
+                }
+
+                Ok(Self { client_key: key })
+            }
+            None => {
+                let key = extract_api_key(&parts.headers)
+                    .or_else(|| extract_query_api_key(parts.uri.query()))
+                    .unwrap_or_default();
+                Ok(Self { client_key: key })
+            }
+        }
+    }
+
     /// Validates request headers against the expected server API key.
     pub fn validate(headers: &HeaderMap, expected_key: Option<&str>) -> Result<Self, ApiError> {
-        let key = extract_api_key(headers).ok_or_else(|| {
-            ApiError::Unauthorized(
-                "Missing API key header (x-api-key or Authorization: Bearer <key>)".to_string(),
-            )
-        })?;
+        match expected_key {
+            Some(expected) => {
+                let key = extract_api_key(headers).ok_or_else(|| {
+                    ApiError::Unauthorized(
+                        "Missing API key header (x-api-key or Authorization: Bearer <key>)".to_string(),
+                    )
+                })?;
 
-        if let Some(expected) = expected_key {
-            if key != expected {
-                return Err(ApiError::Unauthorized("Invalid API key".to_string()));
+                if !constant_time_eq(&key, expected) {
+                    return Err(ApiError::Unauthorized("Invalid API key".to_string()));
+                }
+
+                Ok(Self { client_key: key })
             }
-        } else if key.trim().is_empty() {
-            return Err(ApiError::Unauthorized("API key cannot be empty".to_string()));
+            None => {
+                // When no API key is configured on the server, allow all requests
+                let key = extract_api_key(headers).unwrap_or_default();
+                Ok(Self { client_key: key })
+            }
         }
-
-        Ok(Self { client_key: key })
     }
+}
+
+/// Helper to parse api key from `?api_key=...` or `?apiKey=...`.
+pub fn extract_query_api_key(query_str: Option<&str>) -> Option<String> {
+    if let Some(q) = query_str {
+        for pair in q.split('&') {
+            if let Some((k, v)) = pair.split_once('=') {
+                if k == "api_key" || k == "apiKey" {
+                    let trimmed = v.trim();
+                    if !trimmed.is_empty() {
+                        return Some(trimmed.to_string());
+                    }
+                }
+            }
+        }
+    }
+    None
 }
 
 /// Helper to parse api key from `x-api-key` or `Authorization: Bearer <key>`.
@@ -65,7 +129,7 @@ where
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let config = Arc::<ServerConfig>::from_ref(state);
-        AuthContext::validate(&parts.headers, config.api_key.as_deref())
+        AuthContext::validate_parts(parts, config.api_key.as_deref())
     }
 }
 
@@ -114,5 +178,21 @@ mod tests {
         headers.insert("x-api-key", HeaderValue::from_static("wrong-key"));
         let res = AuthContext::validate(&headers, Some("expected"));
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_none_key_allows_unauthenticated() {
+        let headers = HeaderMap::new();
+        let res = AuthContext::validate(&headers, None);
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_constant_time_eq() {
+        assert!(constant_time_eq("secret123", "secret123"));
+        assert!(!constant_time_eq("secret123", "secret124"));
+        assert!(!constant_time_eq("secret123", "secret12"));
+        assert!(!constant_time_eq("", "secret"));
+        assert!(constant_time_eq("", ""));
     }
 }

@@ -40,13 +40,15 @@ pub struct FunctionExecutionsResponse {
 /// Handler for `GET /v1/functions`.
 pub async fn list_functions(
     State(state): State<AppState>,
+    _auth: crate::auth::AuthContext,
     Query(query): Query<FunctionsQuery>,
 ) -> Result<Json<FunctionsResponse>, ApiError> {
+    let limit = query.limit.map(|l| l.min(1000));
     let filter = FunctionFilter {
         service_name: query.service_name,
         environment: query.environment,
         search: query.search,
-        limit: query.limit,
+        limit,
     };
 
     let functions = state
@@ -62,15 +64,30 @@ pub async fn list_functions(
 /// Handler for `GET /v1/functions/{id}/executions`.
 pub async fn list_function_executions(
     State(state): State<AppState>,
+    _auth: crate::auth::AuthContext,
     Path(id): Path<String>,
     Query(query): Query<ExecutionsPaginationQuery>,
 ) -> Result<Json<FunctionExecutionsResponse>, ApiError> {
+    let limit = query.limit.map(|l| l.min(1000));
+    let (service_override, func_name) = if id.contains(':') {
+        let parts: Vec<&str> = id.split(':').collect();
+        if parts.len() >= 3 {
+            (Some(parts[0].to_string()), parts[parts.len() - 1].to_string())
+        } else if parts.len() == 2 {
+            (None, parts[1].to_string())
+        } else {
+            (None, id.clone())
+        }
+    } else {
+        (None, id.clone())
+    };
+
     let filter = ExecutionFilter {
-        service_name: query.service_name,
+        service_name: query.service_name.or(service_override),
         environment: query.environment,
-        function_name: Some(id.clone()),
+        function_name: Some(func_name),
         status: query.status,
-        limit: query.limit,
+        limit,
         offset: query.offset,
         ..Default::default()
     };

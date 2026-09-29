@@ -77,6 +77,61 @@ impl ServerConfig {
     pub fn socket_addr_str(&self) -> String {
         format!("{}:{}", self.host, self.port)
     }
+
+    /// Loads configuration from environment variables, falling back to defaults.
+    pub fn from_env() -> Self {
+        let mut cfg = Self::default();
+
+        if let Ok(host) = std::env::var("EVENTSLOG_HOST").or_else(|_| std::env::var("HOST")) {
+            if !host.trim().is_empty() {
+                cfg.host = host.trim().to_string();
+            }
+        }
+
+        if let Ok(port_str) = std::env::var("EVENTSLOG_PORT").or_else(|_| std::env::var("PORT")) {
+            if let Ok(port) = port_str.trim().parse::<u16>() {
+                cfg.port = port;
+            }
+        }
+
+        if let Ok(url) = std::env::var("EVENTSLOG_CLICKHOUSE_URL").or_else(|_| std::env::var("CLICKHOUSE_URL")) {
+            if !url.trim().is_empty() {
+                cfg.clickhouse_url = url.trim().to_string();
+            }
+        }
+
+        if let Ok(buf_str) = std::env::var("EVENTSLOG_BUFFER_SIZE").or_else(|_| std::env::var("BUFFER_SIZE")) {
+            if let Ok(buf) = buf_str.trim().parse::<usize>() {
+                cfg.buffer_size = buf;
+            }
+        }
+
+        if let Ok(flush_str) = std::env::var("EVENTSLOG_FLUSH_INTERVAL_MS").or_else(|_| std::env::var("FLUSH_INTERVAL_MS")) {
+            if let Ok(flush) = flush_str.trim().parse::<u64>() {
+                cfg.flush_interval_ms = flush;
+            }
+        }
+
+        if let Ok(key) = std::env::var("EVENTSLOG_API_KEY").or_else(|_| std::env::var("API_KEY")) {
+            if !key.trim().is_empty() {
+                cfg.api_key = Some(key.trim().to_string());
+            }
+        }
+
+        if let Ok(env) = std::env::var("EVENTSLOG_ENVIRONMENT").or_else(|_| std::env::var("ENVIRONMENT")) {
+            if !env.trim().is_empty() {
+                cfg.environment = env.trim().to_string();
+            }
+        }
+
+        if let Ok(svc) = std::env::var("EVENTSLOG_SERVICE_NAME").or_else(|_| std::env::var("SERVICE_NAME")) {
+            if !svc.trim().is_empty() {
+                cfg.service_name = svc.trim().to_string();
+            }
+        }
+
+        cfg
+    }
 }
 
 #[cfg(test)]
@@ -112,5 +167,19 @@ service_name: "eventslog-ingestion"
         assert_eq!(cfg.api_key.as_deref(), Some("secret-key-123"));
         assert_eq!(cfg.environment, "production");
         assert_eq!(cfg.buffer_size, 50_000);
+    }
+
+    #[test]
+    fn test_server_config_from_env() {
+        std::env::set_var("EVENTSLOG_PORT", "7788");
+        std::env::set_var("EVENTSLOG_HOST", "127.0.0.1");
+        std::env::set_var("EVENTSLOG_API_KEY", "env-secret-999");
+        let cfg = ServerConfig::from_env();
+        assert_eq!(cfg.port, 7788);
+        assert_eq!(cfg.host, "127.0.0.1");
+        assert_eq!(cfg.api_key.as_deref(), Some("env-secret-999"));
+        std::env::remove_var("EVENTSLOG_PORT");
+        std::env::remove_var("EVENTSLOG_HOST");
+        std::env::remove_var("EVENTSLOG_API_KEY");
     }
 }

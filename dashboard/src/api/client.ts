@@ -2,6 +2,7 @@ import type {
   FunctionSummary,
   ExecutionRecord,
   TraceTree,
+  TraceNode,
   ServiceStats,
 } from './types.js';
 
@@ -17,24 +18,31 @@ export class ApiClientError extends Error {
 
 export interface ApiClientOptions {
   baseUrl?: string;
+  apiKey?: string;
   enableFallback?: boolean;
 }
 
 export class EventsLogApiClient {
   private readonly baseUrl: string;
+  private readonly apiKey?: string;
   private readonly enableFallback: boolean;
 
   constructor(options: ApiClientOptions = {}) {
     this.baseUrl = (options.baseUrl ?? '').replace(/\/$/, '');
-    this.enableFallback = options.enableFallback ?? true;
+    this.apiKey = options.apiKey;
+    this.enableFallback = options.enableFallback ?? false;
   }
 
   private async request<T>(path: string): Promise<T> {
     const url = `${this.baseUrl}${path}`;
     try {
-      const res = await fetch(url, {
-        headers: { Accept: 'application/json' },
-      });
+      const headers: Record<string, string> = { Accept: 'application/json' };
+      if (this.apiKey) {
+        headers['x-api-key'] = this.apiKey;
+        headers['Authorization'] = `Bearer ${this.apiKey}`;
+      }
+
+      const res = await fetch(url, { headers });
 
       if (!res.ok) {
         throw new ApiClientError(res.status, `HTTP error ${res.status}: ${res.statusText}`);
@@ -55,8 +63,16 @@ export class EventsLogApiClient {
    */
   async fetchStats(): Promise<ServiceStats> {
     try {
-      const res = await this.request<{ stats: ServiceStats }>('/v1/stats');
-      return res.stats;
+      const res = await this.request<any>('/v1/stats');
+      const s = res?.stats ?? res;
+      return {
+        total_executions: s?.total_executions ?? 0,
+        total_errors: s?.total_errors ?? 0,
+        error_rate: s?.error_rate ?? 0,
+        p50_duration_ms: s?.p50_duration_ms ?? 0,
+        p95_duration_ms: s?.p95_duration_ms ?? 0,
+        p99_duration_ms: s?.p99_duration_ms ?? 0,
+      };
     } catch (err) {
       if (this.enableFallback) {
         return {
@@ -78,8 +94,19 @@ export class EventsLogApiClient {
   async fetchFunctions(service?: string): Promise<FunctionSummary[]> {
     try {
       const query = service ? `?service=${encodeURIComponent(service)}` : '';
-      const res = await this.request<{ functions: FunctionSummary[] }>(`/v1/functions${query}`);
-      return res.functions;
+      const res = await this.request<any>(`/v1/functions${query}`);
+      const list = Array.isArray(res) ? res : (res?.functions ?? []);
+      return list.map((fn: any) => ({
+        function_id: fn.function_id || `${fn.service_name}:${fn.module_name || fn.module}:${fn.function_name}`,
+        service_name: fn.service_name,
+        module: fn.module || fn.module_name || '',
+        class_name: fn.class_name || undefined,
+        function_name: fn.function_name,
+        total_executions: fn.total_executions ?? fn.call_count ?? 0,
+        total_errors: fn.total_errors ?? fn.error_count ?? 0,
+        avg_duration_ms: fn.avg_duration_ms ?? 0,
+        last_seen: fn.last_seen || new Date().toISOString(),
+      }));
     } catch (err) {
       if (this.enableFallback) {
         return [
@@ -127,10 +154,11 @@ export class EventsLogApiClient {
    */
   async fetchFunctionExecutions(functionId: string, limit: number = 50): Promise<ExecutionRecord[]> {
     try {
-      const res = await this.request<{ executions: ExecutionRecord[] }>(
+      const res = await this.request<any>(
         `/v1/functions/${encodeURIComponent(functionId)}/executions?limit=${limit}`
       );
-      return res.executions;
+      const list = Array.isArray(res) ? res : (res?.executions ?? []);
+      return list.map((e: any) => this.mapExecutionRecord(e));
     } catch (err) {
       if (this.enableFallback) {
         return [
@@ -179,10 +207,11 @@ export class EventsLogApiClient {
    */
   async fetchExecution(executionId: string): Promise<ExecutionRecord> {
     try {
-      const res = await this.request<{ execution: ExecutionRecord }>(
+      const res = await this.request<any>(
         `/v1/executions/${encodeURIComponent(executionId)}`
       );
-      return res.execution;
+      const e = res?.execution ?? res;
+      return this.mapExecutionRecord(e);
     } catch (err) {
       if (this.enableFallback) {
         return {
@@ -210,10 +239,18 @@ export class EventsLogApiClient {
    */
   async fetchTrace(traceId: string): Promise<TraceTree> {
     try {
-      const res = await this.request<{ trace: TraceTree }>(
+      const res = await this.request<any>(
         `/v1/traces/${encodeURIComponent(traceId)}`
       );
-      return res.trace;
+      const t = res?.trace ?? res;
+      const rawRoots = t?.root_spans ?? t?.roots ?? [];
+      const root_spans = rawRoots.map((node: any) => this.mapTraceNode(node));
+      return {
+        trace_id: t?.trace_id || traceId,
+        total_spans: t?.total_spans ?? root_spans.length,
+        total_duration_ms: t?.total_duration_ms ?? 0,
+        root_spans,
+      };
     } catch (err) {
       if (this.enableFallback) {
         return {
@@ -262,6 +299,66 @@ export class EventsLogApiClient {
       }
       throw err;
     }
+  }
+
+  private mapExecutionRecord(e: any): ExecutionRecord {
+    let input_payload = e.input_payload;
+    if (!input_payload && e.input_json) {
+      try {
+        input_payload = JSON.parse(e.input_json);
+      } catch {
+        input_payload = e.input_json;
+      }
+    }
+    let output_payload = e.output_payload;
+    if (!output_payload && e.output_json) {
+      try {
+        output_payload = JSON.parse(e.output_json);
+      } catch {
+        output_payload = e.output_json;
+      }
+    }
+    let error = e.error;
+    if (!error && (e.error_type || e.error_message)) {
+      error = {
+        type_name: e.error_type || 'Error',
+        message: e.error_message || '',
+        stack_trace: e.error_stack || undefined,
+      };
+    }
+    return {
+      execution_id: e.execution_id || e.event_id || e.span_id || '',
+      trace_id: e.trace_id,
+      span_id: e.span_id,
+      parent_span_id: e.parent_span_id || undefined,
+      service_name: e.service_name,
+      environment: e.environment,
+      module: e.module || e.module_name || '',
+      class_name: e.class_name || undefined,
+      function_name: e.function_name,
+      status: e.status,
+      duration_ms: e.duration_ms,
+      timestamp: e.timestamp,
+      input_payload,
+      output_payload,
+      error,
+    };
+  }
+
+  private mapTraceNode(node: any): TraceNode {
+    const exec = node.execution ?? {};
+    return {
+      span_id: node.span_id || exec.span_id || '',
+      parent_span_id: node.parent_span_id || exec.parent_span_id || undefined,
+      service_name: node.service_name || exec.service_name || '',
+      module: node.module || exec.module_name || '',
+      class_name: node.class_name || exec.class_name || undefined,
+      function_name: node.function_name || exec.function_name || '',
+      status: node.status || exec.status || 'success',
+      duration_ms: node.duration_ms ?? exec.duration_ms ?? 0,
+      timestamp: node.timestamp || exec.timestamp || new Date().toISOString(),
+      children: Array.isArray(node.children) ? node.children.map((c: any) => this.mapTraceNode(c)) : [],
+    };
   }
 }
 

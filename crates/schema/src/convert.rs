@@ -87,6 +87,33 @@ impl From<&Event> for ExecutionRow {
                     timestamp: event.timestamp,
                 }
             }
+            EventPayload::Error(err) => Self {
+                event_id: event.event_id.to_string(),
+                trace_id: event.trace_id.clone(),
+                span_id: event.span_id.clone(),
+                parent_span_id: event.parent_span_id.clone().unwrap_or_default(),
+                service_name: event.service_name.clone(),
+                environment: event.environment.clone(),
+                module_name: "error".to_string(),
+                class_name: String::new(),
+                function_name: if !err.type_name.is_empty() {
+                    err.type_name.clone()
+                } else {
+                    "Error".to_string()
+                },
+                file_path: String::new(),
+                line_number: 0,
+                input_json: String::new(),
+                output_json: String::new(),
+                duration_ms: 0.0,
+                duration_nanos: 0,
+                status: ExecutionStatus::Error.as_str().to_string(),
+                error_type: err.type_name.clone(),
+                error_message: err.message.clone(),
+                error_stack: err.stack_trace.clone().unwrap_or_default(),
+                attributes_json: String::new(),
+                timestamp: event.timestamp,
+            },
             other => Self {
                 event_id: event.event_id.to_string(),
                 trace_id: event.trace_id.clone(),
@@ -103,7 +130,11 @@ impl From<&Event> for ExecutionRow {
                 output_json: serde_json::to_string(other).unwrap_or_default(),
                 duration_ms: 0.0,
                 duration_nanos: 0,
-                status: ExecutionStatus::Dropped.as_str().to_string(),
+                status: if event.event_type == eventslog_protocol::EventType::Error {
+                    ExecutionStatus::Error.as_str().to_string()
+                } else {
+                    ExecutionStatus::Dropped.as_str().to_string()
+                },
                 error_type: String::new(),
                 error_message: String::new(),
                 error_stack: String::new(),
@@ -231,5 +262,30 @@ mod tests {
 
         let result = ExecutionRow::try_from_event(&event);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_error_event_to_execution_row() {
+        let err = ExecutionError::new("TypeError", "Cannot read properties of undefined")
+            .with_stack_trace("at eval (index.js:1:1)");
+
+        let event = Event {
+            event_id: Uuid::new_v4(),
+            trace_id: "trace_err_1".to_string(),
+            span_id: "span_err_1".to_string(),
+            parent_span_id: None,
+            timestamp: Utc::now(),
+            service_name: "browser-app".to_string(),
+            environment: "prod".to_string(),
+            event_type: eventslog_protocol::EventType::Error,
+            payload: EventPayload::Error(err),
+        };
+
+        let row = ExecutionRow::from(&event);
+        assert_eq!(row.status, "error");
+        assert_eq!(row.error_type, "TypeError");
+        assert_eq!(row.error_message, "Cannot read properties of undefined");
+        assert!(row.error_stack.contains("index.js"));
+        assert_eq!(row.function_name, "TypeError");
     }
 }

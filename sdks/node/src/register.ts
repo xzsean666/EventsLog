@@ -2,6 +2,7 @@ import { loadConfig } from './config/loader.js';
 import { HttpTransport } from './transport/http.js';
 import { EventBatcher } from './batching/batcher.js';
 import { installModuleHook } from './loader/interceptor.js';
+import { installConsoleHook } from './logging/console.js';
 import type { EventsLogConfig } from './config/types.js';
 
 export interface SdkInstance {
@@ -43,13 +44,21 @@ export function register(): SdkInstance {
     batcher.push(event);
   });
 
+  // Install non-intrusive console telemetry hook
+  installConsoleHook(config, (event) => {
+    batcher.push(event);
+  });
+
   // Attach lifecycle flush handlers
   let isFlushing = false;
-  const gracefulFlush = async () => {
+  const gracefulFlush = async (timeoutMs = 1500) => {
     if (isFlushing) return;
     isFlushing = true;
     try {
-      await batcher.flush();
+      await Promise.race([
+        batcher.flush(),
+        new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
+      ]);
     } catch (err) {
       console.warn('[EventsLog] Failed to flush events on process termination:', err);
     }
@@ -59,12 +68,12 @@ export function register(): SdkInstance {
     await gracefulFlush();
   });
 
-  process.on('SIGINT', async () => {
+  process.once('SIGINT', async () => {
     await gracefulFlush();
     process.exit(130);
   });
 
-  process.on('SIGTERM', async () => {
+  process.once('SIGTERM', async () => {
     await gracefulFlush();
     process.exit(143);
   });

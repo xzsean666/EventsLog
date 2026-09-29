@@ -15,6 +15,11 @@
       "types": "./dist/register.d.ts",
       "import": "./dist/register.mjs",
       "require": "./dist/register.js"
+    },
+    "./loader": {
+      "types": "./dist/loader/esm.d.ts",
+      "import": "./dist/loader/esm.mjs",
+      "require": "./dist/loader/esm.js"
     }
   },
   "files": [

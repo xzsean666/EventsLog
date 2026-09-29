@@ -32,13 +32,23 @@ pub struct FunctionFilter {
 /// Aggregated function summary row.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FunctionSummary {
+    #[serde(default)]
+    pub function_id: String,
     pub service_name: String,
     pub module_name: String,
+    #[serde(default)]
+    pub module: String,
+    #[serde(default)]
+    pub class_name: Option<String>,
     pub function_name: String,
     #[serde(default)]
     pub call_count: u64,
     #[serde(default)]
+    pub total_executions: u64,
+    #[serde(default)]
     pub error_count: u64,
+    #[serde(default)]
+    pub total_errors: u64,
     #[serde(default)]
     pub avg_duration_ms: f64,
     pub last_seen: DateTime<Utc>,
@@ -91,22 +101,27 @@ impl ClickHouseStorageClient {
         if let Some(ref env) = filter::sanitize_opt(&filter.environment) {
             conditions.push(format!("environment = '{env}'"));
         }
-        if let Some(ref search) = filter::sanitize_opt(&filter.search) {
+        if let Some(ref search) = filter::sanitize_like_opt(&filter.search) {
             conditions.push(format!(
                 "(function_name LIKE '%{search}%' OR module_name LIKE '%{search}%')"
             ));
         }
 
         let where_clause = conditions.join(" AND ");
-        let limit = filter.limit.unwrap_or(100);
+        let limit = filter.limit.unwrap_or(100).min(1000);
 
         format!(
             "SELECT \
+                concat(service_name, ':', module_name, ':', function_name) AS function_id, \
                 service_name, \
                 module_name, \
+                module_name AS module, \
+                any(class_name) AS class_name, \
                 function_name, \
                 toUInt64(count()) AS call_count, \
+                toUInt64(count()) AS total_executions, \
                 toUInt64(countIf(status = 'error')) AS error_count, \
+                toUInt64(countIf(status = 'error')) AS total_errors, \
                 round(avg(duration_ms), 2) AS avg_duration_ms, \
                 max(timestamp) AS last_seen \
             FROM eventslog.function_executions \
@@ -139,7 +154,7 @@ impl ClickHouseStorageClient {
         }
 
         let where_clause = conditions.join(" AND ");
-        let limit = filter.limit.unwrap_or(50);
+        let limit = filter.limit.unwrap_or(50).min(1000);
         let offset = filter.offset.unwrap_or(0);
 
         format!(
@@ -201,7 +216,22 @@ impl ClickHouseStorageClient {
         filter: &FunctionFilter,
     ) -> Result<Vec<FunctionSummary>, QueryStorageError> {
         let sql = self.build_functions_query(filter);
-        self.execute_query(&sql).await
+        let mut rows: Vec<FunctionSummary> = self.execute_query(&sql).await?;
+        for f in &mut rows {
+            if f.function_id.is_empty() {
+                f.function_id = format!("{}:{}:{}", f.service_name, f.module_name, f.function_name);
+            }
+            if f.module.is_empty() {
+                f.module = f.module_name.clone();
+            }
+            if f.total_executions == 0 && f.call_count > 0 {
+                f.total_executions = f.call_count;
+            }
+            if f.total_errors == 0 && f.error_count > 0 {
+                f.total_errors = f.error_count;
+            }
+        }
+        Ok(rows)
     }
 
     /// Queries executions list matching filter.
@@ -231,6 +261,17 @@ mod filter {
             .map(|s| s.trim())
             .filter(|s| !s.is_empty())
             .map(escape_sql_string)
+    }
+
+    pub fn sanitize_like_opt(opt: &Option<String>) -> Option<String> {
+        opt.as_ref()
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .map(|s| {
+                escape_sql_string(s)
+                    .replace('%', "\\%")
+                    .replace('_', "\\_")
+            })
     }
 }
 

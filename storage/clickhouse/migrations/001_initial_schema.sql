@@ -25,10 +25,14 @@ CREATE TABLE IF NOT EXISTS eventslog.function_executions (
     error_message String DEFAULT '',
     error_stack String DEFAULT '',
     attributes_json String DEFAULT '',
-    timestamp DateTime64(6, 'UTC')
+    timestamp DateTime64(6, 'UTC'),
+    INDEX idx_trace trace_id TYPE bloom_filter(0.01) GRANULARITY 1,
+    INDEX idx_span span_id TYPE bloom_filter(0.01) GRANULARITY 1,
+    INDEX idx_event event_id TYPE bloom_filter(0.01) GRANULARITY 1
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(timestamp)
 ORDER BY (service_name, environment, function_name, timestamp, trace_id, span_id)
+TTL timestamp + INTERVAL 30 DAY
 SETTINGS index_granularity = 8192,
          parts_to_delay_insert = 300,
          parts_to_throw_insert = 600,
@@ -44,11 +48,14 @@ CREATE TABLE IF NOT EXISTS eventslog.events (
     environment LowCardinality(String),
     event_type LowCardinality(String),
     payload_json String DEFAULT '',
-    timestamp DateTime64(6, 'UTC')
+    timestamp DateTime64(6, 'UTC'),
+    INDEX idx_events_trace trace_id TYPE bloom_filter(0.01) GRANULARITY 1
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(timestamp)
 ORDER BY (service_name, environment, event_type, timestamp, trace_id, span_id)
+TTL timestamp + INTERVAL 30 DAY
 SETTINGS index_granularity = 8192,
          parts_to_delay_insert = 300,
          parts_to_throw_insert = 600,
          max_delay_to_insert = 1;
+

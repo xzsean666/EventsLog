@@ -25,18 +25,37 @@ export interface TraceContext {
 
 const asyncLocalStorage = new AsyncLocalStorage<TraceContext>();
 
+// High-performance batched entropy buffer pool for fast hot-path ID generation
+const POOL_SIZE = 4096;
+const entropyPool = new Uint8Array(POOL_SIZE);
+let poolOffset = POOL_SIZE;
+
+function getBufferedRandomHex(byteCount: number): string {
+  if (poolOffset + byteCount > POOL_SIZE) {
+    crypto.randomFillSync(entropyPool);
+    poolOffset = 0;
+  }
+
+  let hex = '';
+  for (let i = 0; i < byteCount; i++) {
+    const val = entropyPool[poolOffset++];
+    hex += (val < 16 ? '0' : '') + val.toString(16);
+  }
+  return hex;
+}
+
 /**
  * Generates a standard 128-bit trace ID represented as 32 lowercase hex characters.
  */
 export function generateTraceId(): string {
-  return crypto.randomBytes(16).toString('hex');
+  return getBufferedRandomHex(16);
 }
 
 /**
  * Generates a standard 64-bit span ID represented as 16 lowercase hex characters.
  */
 export function generateSpanId(): string {
-  return crypto.randomBytes(8).toString('hex');
+  return getBufferedRandomHex(8);
 }
 
 /**

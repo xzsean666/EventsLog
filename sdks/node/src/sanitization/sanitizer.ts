@@ -35,6 +35,24 @@ function normalizeKey(key: string): string {
   return key.toLowerCase().replace(/[-_]/g, '');
 }
 
+const CARD_REGEX =
+  /^(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|3(?:0[0-5]|[68][0-9])[0-9]{11}|6(?:011|5[0-9]{2})[0-9]{12}|(?:2131|1800|35\d{3})\d{11}|(?:[0-9]{4}[ -]?){3}[0-9]{4})$/;
+const JWT_REGEX =
+  /^eyJ[a-zA-Z0-9_-]{4,}\.[a-zA-Z0-9_-]{4,}\.[a-zA-Z0-9_-]*$/;
+const SECRET_PREFIX_REGEX =
+  /^(?:Bearer\s+[a-zA-Z0-9._~+/-]{16,}|(?:sk|pk)_(?:live|test)_[a-zA-Z0-9]{20,}|gh[pousr]_[a-zA-Z0-9]{30,})$/i;
+
+/**
+ * Checks whether a standalone string value matches known high-risk sensitive patterns
+ * such as payment card numbers, JWT tokens, or secret keys.
+ */
+export function isSensitiveValue(val: string): boolean {
+  if (typeof val !== 'string' || val.length < 13) {
+    return false;
+  }
+  return JWT_REGEX.test(val) || CARD_REGEX.test(val) || SECRET_PREFIX_REGEX.test(val);
+}
+
 /**
  * Checks whether a given object key matches any of the normalized sensitive key patterns.
  */
@@ -53,6 +71,7 @@ export function isSensitiveKey(key: string, sensitiveKeys: string[]): boolean {
  * Recursively sanitizes any JavaScript value into a JSON-safe structure:
  * - Detects and breaks circular references
  * - Redacts sensitive field values with `"[REDACTED]"`
+ * - Redacts standalone sensitive values (JWTs, card numbers, tokens) with `"[REDACTED_SENSITIVE_VALUE]"`
  * - Safely converts BigInt, Symbol, Function, Buffer, Error, and Date
  * - Truncates strings, arrays, and deep object graphs exceeding limits
  */
@@ -77,6 +96,9 @@ export function sanitizeValue(value: unknown, options: SanitizerOptions = {}): u
 
     if (valType === 'string') {
       const s = val as string;
+      if (isSensitiveValue(s)) {
+        return '[REDACTED_SENSITIVE_VALUE]';
+      }
       if (s.length > opts.maxStringLength) {
         return s.slice(0, opts.maxStringLength) + `...[TRUNCATED ${s.length - opts.maxStringLength} chars]`;
       }

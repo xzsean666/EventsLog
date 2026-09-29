@@ -37,4 +37,10 @@ State Machine: `TODO` -> `IN_PROGRESS` -> `REVIEW` -> `DONE` (or `BLOCKED`).
 | [TASK-024](tasks/TASK-024.md) | Dashboard Function List, Execution Details & Trace Graph UI | DONE | TASK-014, TASK-023 | `dashboard` |
 | **Milestone 7: End-to-End Integration & Demo** | | | | |
 | [TASK-025](tasks/TASK-025.md) | End-to-End Integration Example & Full System Verification | DONE | TASK-011, TASK-014, TASK-022, TASK-024 | `examples/node` |
-
+| **Milestone 8: System Hardening & Audit Remediation** | | | | |
+| [TASK-026](tasks/TASK-026.md) | Comprehensive Audit Remediation: API Contract Alignment, SDK Robustness, Server Config & Storage Hardening | DONE | TASK-025 | Cross-System |
+| [TASK-027](tasks/TASK-027.md) | Comprehensive System Optimization: Security Hardening, Hot-Path Performance & Zero-Code Console Log Capture | DONE | TASK-026 | Cross-System |
+| **Milestone 9: Client Browser Observability SDK** | | | | |
+| [TASK-028](tasks/TASK-028.md) | Browser SDK Implementation with React & Vue Integrations | DONE | TASK-027 | `sdks/browser` & `services/ingestion` |
+| **Milestone 10: Full-Stack Audit Remediation & Hardening** | | | | |
+| [TASK-029](tasks/TASK-029.md) | Comprehensive System Hardening & Optimization: Security, Performance, and Contract Alignment | DONE | TASK-028 | Cross-System |

@@ -54,16 +54,20 @@ export function wrapFunction<T extends (...args: any[]) => any>(
     }
 
     const childContext = createChildSpan();
-    const startNanos = process.hrtime.bigint();
-
-    const sanitizedInputs = capturePayload(
-      args.length === 1 ? args[0] : args,
-      options.sanitizerOptions,
-      maxPayloadBytes
-    );
+    let sanitizedInputs: unknown;
+    try {
+      sanitizedInputs = capturePayload(
+        args.length === 1 ? args[0] : args,
+        options.sanitizerOptions,
+        maxPayloadBytes
+      );
+    } catch {
+      sanitizedInputs = '[UNSERIALIZABLE_INPUT]';
+    }
 
     return runWithContext(childContext, () => {
       let result: any;
+      const startNanos = process.hrtime.bigint();
       try {
         result = fn.apply(this, args);
       } catch (err) {
@@ -88,11 +92,16 @@ export function wrapFunction<T extends (...args: any[]) => any>(
         return (result as Promise<any>).then(
           (resolvedValue) => {
             const durationNanos = Number(process.hrtime.bigint() - startNanos);
-            const sanitizedOutput = capturePayload(
-              resolvedValue,
-              options.sanitizerOptions,
-              maxPayloadBytes
-            );
+            let sanitizedOutput: unknown;
+            try {
+              sanitizedOutput = capturePayload(
+                resolvedValue,
+                options.sanitizerOptions,
+                maxPayloadBytes
+              );
+            } catch {
+              sanitizedOutput = '[UNSERIALIZABLE_OUTPUT]';
+            }
             emitExecutionEvent({
               context: childContext,
               identity,
@@ -128,7 +137,12 @@ export function wrapFunction<T extends (...args: any[]) => any>(
 
       // Synchronous return
       const durationNanos = Number(process.hrtime.bigint() - startNanos);
-      const sanitizedOutput = capturePayload(result, options.sanitizerOptions, maxPayloadBytes);
+      let sanitizedOutput: unknown;
+      try {
+        sanitizedOutput = capturePayload(result, options.sanitizerOptions, maxPayloadBytes);
+      } catch {
+        sanitizedOutput = '[UNSERIALIZABLE_OUTPUT]';
+      }
 
       emitExecutionEvent({
         context: childContext,
@@ -147,11 +161,25 @@ export function wrapFunction<T extends (...args: any[]) => any>(
     });
   };
 
-  // Preserve metadata and original reference
+  // Preserve metadata, original reference, and static properties
   Object.defineProperty(wrapped, 'name', { value: fn.name, configurable: true });
   Object.defineProperty(wrapped, 'length', { value: fn.length, configurable: true });
   (wrapped as any)[IS_WRAPPED] = true;
   (wrapped as any)[ORIGINAL_FN] = fn;
+
+  const staticProps = Object.getOwnPropertyNames(fn);
+  for (const prop of staticProps) {
+    if (!['prototype', 'length', 'name', 'arguments', 'caller'].includes(prop)) {
+      try {
+        const desc = Object.getOwnPropertyDescriptor(fn, prop);
+        if (desc) {
+          Object.defineProperty(wrapped, prop, desc);
+        }
+      } catch {
+        // Skip unconfigurable properties
+      }
+    }
+  }
 
   return wrapped as unknown as T;
 }

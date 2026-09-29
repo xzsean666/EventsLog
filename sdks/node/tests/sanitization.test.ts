@@ -118,4 +118,19 @@ describe('Payload Limiter & Byte Size Truncation', () => {
     expect(result.apiKey).toBe('[REDACTED]');
     expect(result.content).toBe('clean data');
   });
+
+  it('should redact sensitive values in flat positional argument arrays', () => {
+    // Simulating arguments passed to a function: login(user, rawCardNumber, jwtToken)
+    const args = [
+      'usr_123',
+      '4532-1111-2222-3333',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxMjMifQ.XYZ',
+    ];
+
+    const sanitized = sanitizeValue(args) as any[];
+    expect(sanitized[0]).toBe('usr_123');
+    expect(sanitized[1]).toBe('[REDACTED_SENSITIVE_VALUE]');
+    expect(sanitized[2]).toBe('[REDACTED_SENSITIVE_VALUE]');
+  });
 });
+

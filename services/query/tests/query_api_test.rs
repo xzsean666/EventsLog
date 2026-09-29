@@ -12,10 +12,10 @@ async fn setup_mock_query_app() -> (axum::Router, tokio::task::JoinHandle<()>) {
     let mock_clickhouse = Router::new().route(
         "/",
         post(|body: String| async move {
-            if body.contains("total_executions") {
+            if body.contains("quantile") || body.contains("p50_duration_ms") {
                 // Stats query
                 r#"{"total_executions":100,"total_errors":5,"p50_duration_ms":10.5,"p95_duration_ms":45.2,"p99_duration_ms":90.0}"#.to_string()
-            } else if body.contains("GROUP BY service_name, module_name, function_name") {
+            } else if body.contains("GROUP BY") {
                 // Functions query
                 r#"{"service_name":"order-svc","module_name":"orders","function_name":"place_order","call_count":50,"error_count":1,"avg_duration_ms":22.4,"last_seen":"2026-09-29T10:00:00Z"}"#.to_string()
             } else if body.contains("WHERE trace_id = 'trace-tree-1'") {
@@ -160,4 +160,58 @@ async fn test_get_stats_endpoint() {
     assert_eq!(json["p50_duration_ms"], 10.5);
 
     handle.abort();
+}
+
+#[tokio::test]
+async fn test_query_api_key_auth() {
+    let mock_clickhouse = Router::new().route(
+        "/",
+        post(|_body: String| async move {
+            r#"{"total_executions":10,"total_errors":0,"p50_duration_ms":1.0,"p95_duration_ms":2.0,"p99_duration_ms":3.0}"#.to_string()
+        }),
+    );
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let mock_handle = tokio::spawn(async move {
+        axum::serve(listener, mock_clickhouse).await.unwrap();
+    });
+
+    let storage = Arc::new(ClickHouseStorageClient::new(&format!("http://127.0.0.1:{port}")));
+    let config = ServerConfig {
+        api_key: Some("query-secret-pass".to_string()),
+        ..Default::default()
+    };
+    let app = create_router_with_storage(config, storage);
+
+    // 1. Unauthenticated request -> 401
+    let req_unauth = Request::builder()
+        .uri("/v1/stats")
+        .method("GET")
+        .body(Body::empty())
+        .unwrap();
+    let res = app.clone().oneshot(req_unauth).await.unwrap();
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+
+    // 2. Invalid key -> 401
+    let req_invalid = Request::builder()
+        .uri("/v1/stats")
+        .method("GET")
+        .header("x-api-key", "wrong-key")
+        .body(Body::empty())
+        .unwrap();
+    let res = app.clone().oneshot(req_invalid).await.unwrap();
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+
+    // 3. Valid key -> 200
+    let req_valid = Request::builder()
+        .uri("/v1/stats")
+        .method("GET")
+        .header("x-api-key", "query-secret-pass")
+        .body(Body::empty())
+        .unwrap();
+    let res = app.oneshot(req_valid).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
+    mock_handle.abort();
 }
