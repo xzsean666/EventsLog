@@ -70,6 +70,15 @@ export function loadEnvConfig(): Partial<EventsLogConfig> {
   const batching: Partial<BatchingConfig> = {};
   const instrumentation: Partial<InstrumentationConfig> = {};
 
+  if (process.env.EVENTSLOG_MODE) {
+    const m = process.env.EVENTSLOG_MODE.toLowerCase();
+    if (m === 'local' || m === 'remote' || m === 'auto') {
+      envConfig.mode = m;
+    }
+  }
+  if (process.env.EVENTSLOG_DB_PATH || process.env.EVENTSLOG_SQLITE_PATH) {
+    envConfig.sqlite_path = process.env.EVENTSLOG_DB_PATH || process.env.EVENTSLOG_SQLITE_PATH;
+  }
   if (process.env.EVENTSLOG_ENDPOINT) {
     envConfig.endpoint = process.env.EVENTSLOG_ENDPOINT;
   }
@@ -100,10 +109,21 @@ export function loadEnvConfig(): Partial<EventsLogConfig> {
     const val = parseFloat(process.env.EVENTSLOG_SAMPLING_RATE);
     if (!isNaN(val) && val >= 0 && val <= 1) instrumentation.sampling_rate = val;
   }
+  if (process.env.EVENTSLOG_INCLUDE) {
+    instrumentation.include = process.env.EVENTSLOG_INCLUDE.split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  if (process.env.EVENTSLOG_EXCLUDE) {
+    instrumentation.exclude = process.env.EVENTSLOG_EXCLUDE.split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
 
   if (Object.keys(batching).length > 0) {
     envConfig.batching = batching as BatchingConfig;
   }
+
   if (Object.keys(instrumentation).length > 0) {
     envConfig.instrumentation = instrumentation as InstrumentationConfig;
   }

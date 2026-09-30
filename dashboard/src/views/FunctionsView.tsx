@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { FunctionSummary, ExecutionRecord } from '../api/types.js';
+import type { TelemetryDataProvider } from '../api/provider.js';
 import { defaultApiClient } from '../api/client.js';
 import { ArrowUpDown, ChevronRight } from 'lucide-react';
 
@@ -7,6 +8,7 @@ interface FunctionsViewProps {
   functions: FunctionSummary[];
   searchQuery: string;
   onSelectExecution: (execution: ExecutionRecord) => void;
+  provider?: TelemetryDataProvider;
 }
 
 type SortField = 'name' | 'invocations' | 'errors' | 'latency';
@@ -15,6 +17,7 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
   functions,
   searchQuery,
   onSelectExecution,
+  provider,
 }) => {
   const [selectedFunction, setSelectedFunction] = useState<FunctionSummary | null>(null);
   const [executions, setExecutions] = useState<ExecutionRecord[]>([]);
@@ -26,7 +29,9 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
     setSelectedFunction(fn);
     setIsLoadingExecutions(true);
     try {
-      const records = await defaultApiClient.fetchFunctionExecutions(fn.function_id);
+      const records = provider
+        ? await provider.fetchFunctionExecutions(fn.function_id)
+        : await defaultApiClient.fetchFunctionExecutions(fn.function_id);
       setExecutions(records);
     } catch (err) {
       console.error('Failed to fetch executions:', err);

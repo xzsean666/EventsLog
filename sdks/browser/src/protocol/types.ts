@@ -226,10 +226,136 @@ export interface BrowserConfig {
    */
   allowedTracingOrigins?: (string | RegExp)[];
   /**
+   * Telemetry transmission and storage mode:
+   * - 'remote': Transmit to remote EventsLog Ingestion service via HTTP / sendBeacon.
+   * - 'local': In-browser storage via IndexedDB; zero remote server dependencies.
+   * - 'auto': Attempt remote ingestion; fallback to IndexedDB if remote server is unreachable.
+   * @default 'auto'
+   */
+  mode?: 'remote' | 'local' | 'auto';
+  /**
+   * Name of the IndexedDB database used for local storage mode.
+   * @default 'eventslog_db'
+   */
+  indexedDbName?: string;
+  /**
+   * Enables the in-browser floating DevTools drawer widget for local inspection.
+   * @default false
+   */
+  devtools?: boolean;
+  /**
    * Disabled telemetry flag (useful for testing or local opt-out).
    * @default false
    */
   disabled?: boolean;
+}
+
+/**
+ * Canonical execution record stored in IndexedDB and returned by query APIs.
+ */
+export interface ExecutionRow {
+  event_id: string;
+  trace_id: string;
+  span_id: string;
+  parent_span_id: string;
+  service_name: string;
+  environment: string;
+  module_name: string;
+  class_name: string;
+  function_name: string;
+  file_path: string;
+  line_number: number;
+  input_json: string;
+  output_json: string;
+  duration_ms: number;
+  duration_nanos: number;
+  status: string;
+  error_type: string;
+  error_message: string;
+  error_stack: string;
+  attributes_json: string;
+  timestamp: string;
+}
+
+/**
+ * Aggregated function summary matching platform query API contract.
+ */
+export interface FunctionSummary {
+  function_id: string;
+  service_name: string;
+  module_name: string;
+  module: string;
+  class_name: string | null;
+  function_name: string;
+  call_count: number;
+  total_executions: number;
+  error_count: number;
+  total_errors: number;
+  avg_duration_ms: number;
+  last_seen: string;
+}
+
+/**
+ * Node in an execution trace hierarchy tree.
+ */
+export interface TraceNode {
+  span_id: string;
+  parent_span_id: string;
+  service_name: string;
+  module: string;
+  class_name: string;
+  function_name: string;
+  status: string;
+  duration_ms: number;
+  timestamp: string;
+  execution: ExecutionRow;
+  children: TraceNode[];
+}
+
+/**
+ * Reconstructed trace tree response matching platform query API contract.
+ */
+export interface TraceResponse {
+  trace_id: string;
+  roots: TraceNode[];
+  root_spans: TraceNode[];
+  total_spans: number;
+  total_duration_ms: number;
+}
+
+/**
+ * Platform overview statistics matching platform query API contract.
+ */
+export interface StatsResponse {
+  total_executions: number;
+  total_errors: number;
+  error_rate: number;
+  p50_duration_ms: number;
+  p95_duration_ms: number;
+  p99_duration_ms: number;
+}
+
+/**
+ * Filter parameters for querying function summaries.
+ */
+export interface FunctionFilter {
+  service_name?: string;
+  environment?: string;
+  search?: string;
+  limit?: number;
+}
+
+/**
+ * Filter parameters for querying execution records.
+ */
+export interface ExecutionFilter {
+  service_name?: string;
+  environment?: string;
+  function_name?: string;
+  status?: string;
+  trace_id?: string;
+  limit?: number;
+  offset?: number;
 }
 
 /**

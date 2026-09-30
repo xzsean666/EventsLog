@@ -1,13 +1,16 @@
 import { Event, BatchEventPayload } from '../protocol/types';
+import type { IndexedDBStorage } from './indexeddb';
 
 export interface TransportOptions {
-  endpoint: string;
+  endpoint?: string;
   apiKey?: string;
   batchSize?: number;
   flushIntervalMs?: number;
   maxQueueSize?: number;
   headers?: Record<string, string>;
   disabled?: boolean;
+  mode?: 'remote' | 'local' | 'auto';
+  storage?: IndexedDBStorage;
 }
 
 export class BrowserBatchBuffer {
@@ -23,6 +26,8 @@ export class BrowserBatchBuffer {
   private readonly maxQueueSize: number;
   private readonly customHeaders: Record<string, string>;
   private readonly disabled: boolean;
+  private readonly mode: 'remote' | 'local' | 'auto';
+  private readonly storage?: IndexedDBStorage;
 
   constructor(options: TransportOptions) {
     this.endpoint = options.endpoint || 'http://localhost:8001/v1/events';
@@ -32,6 +37,8 @@ export class BrowserBatchBuffer {
     this.maxQueueSize = options.maxQueueSize ?? 1000;
     this.customHeaders = options.headers || {};
     this.disabled = !!options.disabled;
+    this.mode = options.mode || 'auto';
+    this.storage = options.storage;
 
     this.startTimer();
     this.setupPageUnloadHandlers();
@@ -74,6 +81,16 @@ export class BrowserBatchBuffer {
           ? this.queue.splice(0, Math.min(this.queue.length, 200))
           : this.queue.splice(0, this.batchSize);
 
+        // In pure local mode: write directly to IndexedDB without any network requests
+        if (this.mode === 'local') {
+          if (this.storage) {
+            await this.storage.insertBatch(batch);
+          }
+          continue;
+        }
+
+        // Remote or Auto mode: attempt remote transmission
+        let remoteSuccess = false;
         const payload: BatchEventPayload = { events: batch };
         const jsonBody = JSON.stringify(payload);
 
@@ -87,6 +104,7 @@ export class BrowserBatchBuffer {
           const blob = new Blob([jsonBody], { type: 'application/json' });
           const sent = navigator.sendBeacon(beaconEndpoint, blob);
           if (sent) {
+            remoteSuccess = true;
             break;
           }
         }
@@ -102,16 +120,28 @@ export class BrowserBatchBuffer {
         }
 
         if (typeof fetch !== 'undefined') {
-          await fetch(this.endpoint, {
-            method: 'POST',
-            headers,
-            body: jsonBody,
-            keepalive: true,
-            mode: 'cors',
-          });
+          try {
+            const res = await fetch(this.endpoint, {
+              method: 'POST',
+              headers,
+              body: jsonBody,
+              keepalive: true,
+              mode: 'cors',
+            });
+            if (res.ok || res.status < 500) {
+              remoteSuccess = true;
+            }
+          } catch {
+            remoteSuccess = false;
+          }
         }
 
-        if (useBeacon) {
+        // If remote delivery failed in auto mode, preserve telemetry in IndexedDB
+        if (!remoteSuccess && this.mode === 'auto' && this.storage) {
+          await this.storage.insertBatch(batch);
+        }
+
+        if (useBeacon && remoteSuccess) {
           break;
         }
       }
@@ -145,8 +175,12 @@ export class BrowserBatchBuffer {
       void this.flush(true);
     };
 
-    document.addEventListener('visibilitychange', this.visibilityHandler);
-    window.addEventListener('pagehide', this.pagehideHandler);
+    if (typeof document.addEventListener === 'function') {
+      document.addEventListener('visibilitychange', this.visibilityHandler);
+    }
+    if (typeof window.addEventListener === 'function') {
+      window.addEventListener('pagehide', this.pagehideHandler);
+    }
   }
 
   destroy(): void {
@@ -155,11 +189,11 @@ export class BrowserBatchBuffer {
       clearInterval(this.flushTimer);
       this.flushTimer = null;
     }
-    if (this.visibilityHandler && typeof document !== 'undefined') {
+    if (this.visibilityHandler && typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
       document.removeEventListener('visibilitychange', this.visibilityHandler);
       this.visibilityHandler = null;
     }
-    if (this.pagehideHandler && typeof window !== 'undefined') {
+    if (this.pagehideHandler && typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
       window.removeEventListener('pagehide', this.pagehideHandler);
       this.pagehideHandler = null;
     }

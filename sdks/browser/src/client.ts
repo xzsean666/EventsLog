@@ -8,6 +8,8 @@ import {
 import { BrowserContextManager, defaultContextManager, generateEventId, SpanContext } from './tracing/context';
 import { BrowserSanitizer } from './sanitization/sanitizer';
 import { BrowserBatchBuffer } from './transport/buffer';
+import { IndexedDBStorage } from './transport/indexeddb';
+import { mountDevTools, type DevToolsController } from './devtools';
 import { GlobalErrorInterceptor } from './interceptors/errors';
 import { FetchInterceptor } from './interceptors/fetch';
 import { ConsoleInterceptor } from './interceptors/console';
@@ -25,6 +27,8 @@ export class EventsLogBrowserClient {
   public readonly contextManager: BrowserContextManager;
   public readonly sanitizer: BrowserSanitizer;
   public readonly buffer: BrowserBatchBuffer;
+  public readonly storage: IndexedDBStorage;
+  public readonly devtoolsController?: DevToolsController;
 
   private errorInterceptor: GlobalErrorInterceptor | null = null;
   private fetchInterceptor: FetchInterceptor | null = null;
@@ -46,6 +50,9 @@ export class EventsLogBrowserClient {
       maxPayloadBytes: config.maxPayloadBytes ?? 32 * 1024,
       headers: config.headers,
       allowedTracingOrigins: config.allowedTracingOrigins,
+      mode: config.mode || 'auto',
+      indexedDbName: config.indexedDbName || 'eventslog_db',
+      devtools: config.devtools ?? false,
       disabled: config.disabled ?? false,
     };
 
@@ -53,6 +60,10 @@ export class EventsLogBrowserClient {
     this.sanitizer = new BrowserSanitizer({
       customSensitiveKeys: this.config.sanitizeKeys,
       maxPayloadBytes: this.config.maxPayloadBytes,
+    });
+
+    this.storage = new IndexedDBStorage({
+      dbName: this.config.indexedDbName,
     });
 
     this.buffer = new BrowserBatchBuffer({
@@ -63,7 +74,13 @@ export class EventsLogBrowserClient {
       maxQueueSize: this.config.maxQueueSize,
       headers: this.config.headers,
       disabled: this.config.disabled,
+      mode: this.config.mode,
+      storage: this.storage,
     });
+
+    if (this.config.devtools && typeof window !== 'undefined') {
+      this.devtoolsController = mountDevTools(this);
+    }
 
     this.initInterceptors();
   }
@@ -326,9 +343,11 @@ export class EventsLogBrowserClient {
   }
 
   destroy(): void {
+    this.devtoolsController?.destroy();
     this.errorInterceptor?.uninstall();
     this.fetchInterceptor?.uninstall();
     this.consoleInterceptor?.uninstall();
     this.buffer.destroy();
+    this.storage.close();
   }
 }

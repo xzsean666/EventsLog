@@ -40,3 +40,12 @@
   - Client ingestion: Ingestion Service connection URL explicitly passes `async_insert=1&wait_for_async_insert=1&async_insert_busy_timeout_ms=200&log_queries=0`.
   - DDL: Monthly partitions (`toYYYYMM(timestamp)`), table `SETTINGS parts_to_delay_insert = 300, parts_to_throw_insert = 600, max_delay_to_insert = 1`.
 - **Consequences**: Prevents disk exhaustion from system logs, eliminates "Too many parts" write stalls, and maximizes ingestion throughput.
+
+## DEC-007: Local Storage Mode Architecture (In-Process SQLite & In-Browser IndexedDB)
+- **Context**: In local development, testing, and debugging, requiring developers to deploy and run ClickHouse, Docker, and multiple backend microservices creates an unnecessary barrier to adoption. Developers want external projects that only install `@eventslog/node` or `@eventslog/browser` to run immediately without any external services.
+- **Decision**: Provide a zero-infrastructure dual local storage architecture:
+  1. **Node.js**: Use Node's native `node:sqlite` (`DatabaseSync`) with WAL mode (`eventslog.db`) to capture and persist telemetry directly in-process.
+  2. **Browser**: Use in-browser `IndexedDB` (`eventslog_db`) with indexed queries and an optional floating in-page DevTools drawer widget (`devtools: true`).
+  3. **Standalone Rust Service**: Provide `services/local` (`eventslog-local`) embedding SQLite via `rusqlite` with WAL mode, offering unified HTTP Ingestion and Query APIs on port 8080.
+  4. **Dashboard**: Implement a pluggable `TelemetryDataProvider` (`HttpDataProvider`, `IndexedDBDataProvider`) and Topbar `ProviderRegistry` switcher.
+- **Consequences**: Enables 100% zero-server, zero-docker local observability while maintaining complete data model parity with the distributed ClickHouse backend.

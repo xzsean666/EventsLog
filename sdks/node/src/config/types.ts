@@ -50,10 +50,25 @@ export interface InstrumentationConfig {
   max_payload_bytes: number;
 }
 
+export type TelemetryMode = 'remote' | 'local' | 'auto';
+
 /**
  * Top-level EventsLog client configuration.
  */
 export interface EventsLogConfig {
+  /**
+   * Telemetry mode:
+   * - 'remote': Sends events to remote Ingestion HTTP service.
+   * - 'local': Directly writes events into local SQLite database in-process (zero-dependency).
+   * - 'auto': Uses remote endpoint if explicitly configured, otherwise local SQLite.
+   * Default: 'auto'.
+   */
+  mode: TelemetryMode;
+  /**
+   * Path to the SQLite database file when running in local mode.
+   * Default: `./eventslog.db`.
+   */
+  sqlite_path: string;
   /**
    * Ingestion service HTTP endpoint URL.
    * Default: `http://127.0.0.1:8080/v1/events`.
@@ -109,6 +124,8 @@ export const DEFAULT_INSTRUMENTATION_CONFIG: InstrumentationConfig = {
 };
 
 export const DEFAULT_CONFIG: EventsLogConfig = {
+  mode: 'auto',
+  sqlite_path: './eventslog.db',
   endpoint: 'http://127.0.0.1:8080/v1/events',
   api_key: '',
   service_name: 'node-service',
@@ -116,3 +133,4 @@ export const DEFAULT_CONFIG: EventsLogConfig = {
   batching: DEFAULT_BATCHING_CONFIG,
   instrumentation: DEFAULT_INSTRUMENTATION_CONFIG,
 };
+

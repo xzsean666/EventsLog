@@ -966,3 +966,48 @@ The final EventsLog architecture can be summarized as:
         ▼
 Application
 ```
+
+---
+
+# 25. Local Storage Mode Architecture (SQLite & IndexedDB)
+
+In addition to the enterprise-scale distributed backend (ClickHouse + Axum Ingestion & Query services), EventsLog provides a first-class **Local Storage Mode** enabling developers to observe, trace, and debug applications with zero external infrastructure, zero Docker containers, and zero remote network requests.
+
+```text
+┌────────────────────────────────────────────────────────────────────────┐
+│                        EventsLog Dual Topology                         │
+├──────────────────────────────────┬─────────────────────────────────────┤
+│         Local Mode               │            Distributed Mode         │
+│   (Zero Server / Debugging)      │         (Production Enterprise)     │
+├──────────────────────────────────┼─────────────────────────────────────┤
+│ • Node.js: in-process SQLite     │ • SDKs: Bounded Ring Buffer         │
+│   (node:sqlite WAL mode)         │ • Network: HTTP Batch Ingestion     │
+│ • Browser: in-browser IndexedDB  │ • Ingestion: Rust Axum Server :8080 │
+│   (eventslog_db ObjectStore)     │ • Storage: ClickHouse Cluster :8123 │
+│ • Local Service: Rust Axum       │ • Query: Rust Query Service :8081   │
+│   (eventslog-local + SQLite)     │ • Dashboard: Remote HTTP Provider   │
+│ • Dashboard: ProviderRegistry    │                                     │
+└──────────────────────────────────┴─────────────────────────────────────┘
+```
+
+### 1. In-Process Node.js Local Mode (`sdks/node`)
+- **Native Engine**: Utilizes Node 22+ native `node:sqlite` (`DatabaseSync`), requiring zero C++ addon compilation.
+- **WAL Journaling**: Configures `PRAGMA journal_mode = WAL` and `PRAGMA synchronous = NORMAL` for concurrent, non-blocking disk writes.
+- **Zero-Code Auto-Registration**: Running `EVENTSLOG_MODE=local node -r @eventslog/node/register app.js` automatically initializes `./eventslog.db` and writes all function executions, durations, arguments, and traces directly to SQLite without starting any server processes.
+
+### 2. In-Browser IndexedDB Local Mode & Embedded DevTools (`sdks/browser`)
+- **Native Client Storage**: Uses browser `IndexedDB` (`eventslog_db`) with indexed queries for `trace_id`, `function_name`, `timestamp`, and `status`.
+- **Query Parity**: Provides complete query methods (`listFunctions`, `listExecutions`, `getTrace`, `getStats`) directly in the browser runtime.
+- **Embedded DevTools Drawer**: Mounting `devtools: true` injects a floating `⚡ EventsLog` badge and slide-up inspection drawer in the host web page for real-time debugging.
+
+### 3. Standalone Rust Local Service (`services/local`)
+- **Binary**: `eventslog-local` (`cargo run -p eventslog-local --bin eventslog-local`).
+- **Unified Engine**: Combines Ingestion (`POST /v1/events`) and Query (`GET /v1/functions`, `GET /v1/executions`, `GET /v1/traces/:id`, `GET /v1/stats`) on a single port (`8080`).
+- **Embedded SQLite**: Backed by `rusqlite` with WAL mode and `r2d2` connection pooling.
+
+### 4. Web Dashboard Multi-Provider Data Source (`dashboard`)
+- **`TelemetryDataProvider` Interface**: Standard abstraction implemented by `HttpDataProvider` and `IndexedDBDataProvider`.
+- **`ProviderRegistry`**: Dynamic switching across:
+  1. `remote`: Distributed ClickHouse Query Service (`http://localhost:8081`).
+  2. `local_sqlite`: Standalone local Rust SQLite service (`http://localhost:8080`).
+  3. `indexeddb`: In-browser IndexedDB storage (`eventslog_db`).

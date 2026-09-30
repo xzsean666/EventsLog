@@ -4,7 +4,7 @@ import { Topbar } from './components/Topbar.js';
 import { FunctionsView } from './views/FunctionsView.js';
 import { TraceTreeView } from './views/TraceTreeView.js';
 import { ExecutionDetailModal } from './views/ExecutionDetailModal.js';
-import { defaultApiClient } from './api/client.js';
+import { defaultProviderRegistry } from './api/provider.js';
 import type { ServiceStats, FunctionSummary, TraceTree, ExecutionRecord } from './api/types.js';
 import { Activity, AlertTriangle, Clock, Zap } from 'lucide-react';
 
@@ -12,6 +12,12 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  const [providerId, setProviderId] = useState<string>(() =>
+    defaultProviderRegistry.getActiveProviderId()
+  );
+  const currentProvider =
+    defaultProviderRegistry.getProvider(providerId) || defaultProviderRegistry.getActiveProvider();
 
   const [stats, setStats] = useState<ServiceStats | null>(null);
   const [functions, setFunctions] = useState<FunctionSummary[]>([]);
@@ -21,10 +27,21 @@ export const App: React.FC = () => {
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
+      const provider =
+        defaultProviderRegistry.getProvider(providerId) || defaultProviderRegistry.getActiveProvider();
       const [statsData, funcsData, traceData] = await Promise.all([
-        defaultApiClient.fetchStats(),
-        defaultApiClient.fetchFunctions(),
-        defaultApiClient.fetchTrace('0af7651916cd43dd8448eb211c80319c'),
+        provider.fetchStats().catch((err) => {
+          console.warn('Failed to fetch stats:', err);
+          return null;
+        }),
+        provider.fetchFunctions().catch((err) => {
+          console.warn('Failed to fetch functions:', err);
+          return [];
+        }),
+        provider.fetchTrace('0af7651916cd43dd8448eb211c80319c').catch((err) => {
+          console.warn('Failed to fetch trace:', err);
+          return null;
+        }),
       ]);
       setStats(statsData);
       setFunctions(funcsData);
@@ -34,7 +51,7 @@ export const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [providerId]);
 
   useEffect(() => {
     void loadData();
@@ -57,6 +74,12 @@ export const App: React.FC = () => {
           isLoading={isLoading}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
+          activeProviderId={providerId}
+          onProviderChange={(newId) => {
+            setProviderId(newId);
+            defaultProviderRegistry.setActiveProvider(newId);
+          }}
+          providers={defaultProviderRegistry.getProviders()}
         />
 
         <main className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -175,6 +198,7 @@ export const App: React.FC = () => {
               functions={functions}
               searchQuery={searchQuery}
               onSelectExecution={setSelectedExecution}
+              provider={currentProvider}
             />
           )}
 

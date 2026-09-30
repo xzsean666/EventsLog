@@ -84,5 +84,7 @@ export * from './protocol/types';
 export * from './tracing/context';
 export * from './sanitization/sanitizer';
 export * from './transport/buffer';
+export * from './transport/indexeddb';
+export * from './devtools';
 export * from './client';
 export { defaultContextManager };

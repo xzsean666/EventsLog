@@ -49,7 +49,12 @@ State Machine: `TODO` -> `IN_PROGRESS` -> `REVIEW` -> `DONE` (or `BLOCKED`).
 | **Milestone 12: Mobile Client Observability (Flutter / Dart)** | | | | |
 | [TASK-031](tasks/TASK-031.md) | Flutter / Dart Client SDK & AST Instrumentation CLI (Source-Level Zero-Code) | DONE | TASK-003, TASK-016, TASK-030 | `sdks/flutter` & `examples/flutter` |
 | [TASK-032](tasks/TASK-032.md) | Flutter / Dart Full-Stack End-to-End Simulation & Verification | DONE | TASK-007, TASK-011, TASK-014, TASK-031 | `tests/e2e`, `examples/flutter`, Cross-System |
-
-
-
+| **Milestone 13: Documentation & Developer Experience Hardening** | | | | |
+| [TASK-033](tasks/TASK-033.md) | Comprehensive Project Documentation Enhancement & Detailed README Overhaul | DONE | TASK-025, TASK-028, TASK-031, TASK-032 | `README.md` & Project Docs |
+| **Milestone 14: Local Storage Mode (SQLite & IndexedDB)** | | | | |
+| [TASK-034](tasks/TASK-034.md) | Rust Local Service with SQLite Storage Engine (`services/local`) | DONE | TASK-003, TASK-004, TASK-005, TASK-006, TASK-014 | `services/local` |
+| [TASK-035](tasks/TASK-035.md) | Node.js SDK In-Process SQLite Local Mode | DONE | TASK-034, TASK-021 | `sdks/node` |
+| [TASK-036](tasks/TASK-036.md) | Browser SDK In-Browser IndexedDB Local Mode | DONE | TASK-035, TASK-028 | `sdks/browser` |
+| [TASK-037](tasks/TASK-037.md) | Web Dashboard Multi-Provider Data Source & Embedded DevTools | DONE | TASK-035, TASK-036 | `dashboard`, `sdks/browser` |
+| [TASK-038](tasks/TASK-038.md) | Local Mode Full-Stack End-to-End Simulation & Verification | DONE | TASK-034, TASK-035, TASK-036, TASK-037 | Cross-System |
 

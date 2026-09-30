@@ -1,5 +1,7 @@
 import { loadConfig } from './config/loader.js';
 import { HttpTransport } from './transport/http.js';
+import { SqliteTransport } from './transport/sqlite.js';
+import type { BatcherTransport } from './batching/batcher.js';
 import { EventBatcher } from './batching/batcher.js';
 import { installModuleHook } from './loader/interceptor.js';
 import { installConsoleHook } from './logging/console.js';
@@ -8,7 +10,7 @@ import type { EventsLogConfig } from './config/types.js';
 export interface SdkInstance {
   config: EventsLogConfig;
   batcher: EventBatcher;
-  transport: HttpTransport;
+  transport: BatcherTransport;
   flush: () => Promise<void>;
   shutdown: () => Promise<void>;
 }
@@ -27,10 +29,24 @@ export function register(): SdkInstance {
   }
 
   const config = loadConfig();
-  const transport = new HttpTransport({
-    endpoint: config.endpoint,
-    apiKey: config.api_key,
-  });
+  const isLocal =
+    config.mode === 'local' ||
+    (config.mode === 'auto' &&
+      !process.env.EVENTSLOG_ENDPOINT &&
+      config.endpoint === 'http://127.0.0.1:8080/v1/events');
+
+  const transport: BatcherTransport = isLocal
+    ? new SqliteTransport({ dbPath: config.sqlite_path })
+    : new HttpTransport({
+        endpoint: config.endpoint,
+        apiKey: config.api_key,
+      });
+
+  // In zero-config local mode, observe all application functions by default if not explicitly configured
+  if (isLocal && config.instrumentation.include.length === 0) {
+    config.instrumentation.include = ['*'];
+  }
+
 
   const batcher = new EventBatcher({
     maxBatchSize: config.batching.max_batch_size,
@@ -38,6 +54,7 @@ export function register(): SdkInstance {
     maxQueueSize: config.batching.max_queue_size,
     transport,
   });
+
 
   // Install module interceptor hook
   installModuleHook(config, (event) => {
