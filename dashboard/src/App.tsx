@@ -29,7 +29,7 @@ export const App: React.FC = () => {
     try {
       const provider =
         defaultProviderRegistry.getProvider(providerId) || defaultProviderRegistry.getActiveProvider();
-      const [statsData, funcsData, traceData] = await Promise.all([
+      const [statsData, funcsData] = await Promise.all([
         provider.fetchStats().catch((err) => {
           console.warn('Failed to fetch stats:', err);
           return null;
@@ -38,20 +38,28 @@ export const App: React.FC = () => {
           console.warn('Failed to fetch functions:', err);
           return [];
         }),
-        provider.fetchTrace('0af7651916cd43dd8448eb211c80319c').catch((err) => {
-          console.warn('Failed to fetch trace:', err);
-          return null;
-        }),
       ]);
       setStats(statsData);
       setFunctions(funcsData);
-      setActiveTrace(traceData);
+
+      // Auto-load most recent trace dynamically if none is selected
+      if (!activeTrace && funcsData.length > 0) {
+        try {
+          const sampleExecs = await provider.fetchFunctionExecutions(funcsData[0].function_id, 1);
+          if (sampleExecs.length > 0 && sampleExecs[0].trace_id) {
+            const initialTrace = await provider.fetchTrace(sampleExecs[0].trace_id);
+            setActiveTrace(initialTrace);
+          }
+        } catch {
+          // Gracefully omit active trace if not available
+        }
+      }
     } catch (err) {
       console.error('Failed to load dashboard telemetry:', err);
     } finally {
       setIsLoading(false);
     }
-  }, [providerId]);
+  }, [providerId, activeTrace]);
 
   useEffect(() => {
     void loadData();
@@ -202,11 +210,19 @@ export const App: React.FC = () => {
             />
           )}
 
-          {activeTab === 'traces' && activeTrace && (
-            <TraceTreeView
-              trace={activeTrace}
-              onSelectSpan={setSelectedExecution}
-            />
+          {activeTab === 'traces' && (
+            activeTrace ? (
+              <TraceTreeView
+                trace={activeTrace}
+                onSelectSpan={setSelectedExecution}
+              />
+            ) : (
+              <div className="p-12 text-center text-slate-500 bg-slate-900 border border-slate-800 rounded-xl">
+                <Clock className="w-8 h-8 mx-auto mb-3 opacity-40 text-indigo-400" />
+                <p className="font-semibold text-slate-300 text-sm">No Active Trace Selected</p>
+                <p className="text-xs text-slate-500 mt-1">Select an execution record from the Functions view and click &quot;View Trace&quot; to inspect its execution hierarchy.</p>
+              </div>
+            )
           )}
         </main>
       </div>
@@ -215,9 +231,17 @@ export const App: React.FC = () => {
       <ExecutionDetailModal
         execution={selectedExecution}
         onClose={() => setSelectedExecution(null)}
-        onViewTrace={(_tId) => {
-          setActiveTab('traces');
+        onViewTrace={async (traceId) => {
           setSelectedExecution(null);
+          setActiveTab('traces');
+          if (traceId) {
+            try {
+              const trace = await currentProvider.fetchTrace(traceId);
+              setActiveTrace(trace);
+            } catch (err) {
+              console.warn('Failed to load clicked trace:', err);
+            }
+          }
         }}
       />
     </div>

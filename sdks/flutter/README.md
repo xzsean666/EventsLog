@@ -4,6 +4,10 @@ Zero-Code Function Observability and Source-Level AST Instrumentation for Flutte
 
 ---
 
+> 📖 **进阶文档**：详细的使用手册与手机真机测试搭建，请阅读 [本地团队协作与手机服务端搭建指南 (MOBILE_SETUP_GUIDE.md)](./MOBILE_SETUP_GUIDE.md)。
+
+---
+
 ## 1. Overview
 
 In Flutter and Dart applications, Ahead-Of-Time (AOT) compilation and the omission of runtime reflection (`dart:mirrors`) prevent runtime dynamic monkey-patching.

@@ -445,7 +445,7 @@ async function runScenario4_DashboardMultiProvider(): Promise<void> {
   logInfo('Verifying that Dashboard can switch between Remote, Local SQLite, and In-Browser IndexedDB.');
 
   const { ProviderRegistry, HttpDataProvider, IndexedDBDataProvider } = await import(
-    '../../../dashboard/src/api/provider.ts'
+    '../../../dashboard/src/api/provider.js'
   );
 
   const registry = new ProviderRegistry();

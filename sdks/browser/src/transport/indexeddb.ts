@@ -12,6 +12,7 @@ import {
 export interface IndexedDBStorageOptions {
   dbName?: string;
   version?: number;
+  maxRecords?: number;
 }
 
 /**
@@ -179,12 +180,14 @@ export function eventToExecutionRow(event: Event): ExecutionRow {
 export class IndexedDBStorage {
   private readonly dbName: string;
   private readonly version: number;
+  private readonly maxRecords: number;
   private db: IDBDatabase | null = null;
   private initPromise: Promise<IDBDatabase | null> | null = null;
 
   constructor(options: IndexedDBStorageOptions = {}) {
     this.dbName = options.dbName || 'eventslog_db';
     this.version = options.version ?? 1;
+    this.maxRecords = options.maxRecords ?? 5000;
   }
 
   /**
@@ -267,6 +270,8 @@ export class IndexedDBStorage {
           store.put(row);
         }
 
+        this.pruneOldRecords(store);
+
         tx.oncomplete = () => resolve(true);
         tx.onerror = () => resolve(false);
         tx.onabort = () => resolve(false);
@@ -274,6 +279,35 @@ export class IndexedDBStorage {
         resolve(false);
       }
     });
+  }
+
+  /**
+   * Prunes oldest execution records when stored records exceed maxRecords limit.
+   */
+  private pruneOldRecords(store: IDBObjectStore): void {
+    try {
+      if (!store.indexNames.contains('timestamp')) return;
+      const countReq = store.count();
+      countReq.onsuccess = () => {
+        const total = countReq.result;
+        if (total > this.maxRecords) {
+          const excess = total - this.maxRecords;
+          const timeIndex = store.index('timestamp');
+          const cursorReq = timeIndex.openCursor();
+          let deleted = 0;
+          cursorReq.onsuccess = (e) => {
+            const cursor = (e.target as IDBRequest<IDBCursorWithValue>).result;
+            if (cursor && deleted < excess) {
+              cursor.delete();
+              deleted++;
+              cursor.continue();
+            }
+          };
+        }
+      };
+    } catch {
+      // Fail-safe: pruning errors should never interrupt telemetry capture
+    }
   }
 
   /**

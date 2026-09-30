@@ -77,6 +77,8 @@ async function main() {
   try {
     console.log('--> Step 2: Initializing NestJS Backend with @eventslog/node Instrumentation...');
     const nodeConfig: EventsLogConfig = {
+      mode: 'remote',
+      sqlite_path: './eventslog.db',
       service_name: 'nestjs-ecommerce-backend',
       environment: 'staging',
       endpoint: `${services.ingestionUrl}/v1/events`,

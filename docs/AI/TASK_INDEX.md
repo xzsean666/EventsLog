@@ -57,4 +57,6 @@ State Machine: `TODO` -> `IN_PROGRESS` -> `REVIEW` -> `DONE` (or `BLOCKED`).
 | [TASK-036](tasks/TASK-036.md) | Browser SDK In-Browser IndexedDB Local Mode | DONE | TASK-035, TASK-028 | `sdks/browser` |
 | [TASK-037](tasks/TASK-037.md) | Web Dashboard Multi-Provider Data Source & Embedded DevTools | DONE | TASK-035, TASK-036 | `dashboard`, `sdks/browser` |
 | [TASK-038](tasks/TASK-038.md) | Local Mode Full-Stack End-to-End Simulation & Verification | DONE | TASK-034, TASK-035, TASK-036, TASK-037 | Cross-System |
+| **Milestone 15: Full-Stack Audit Remediation & Comprehensive Optimization** | | | | |
+| [TASK-039](tasks/TASK-039.md) | Full-Stack Audit Remediation & Comprehensive System Optimization | DONE | TASK-038 | Cross-System |
 

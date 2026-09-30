@@ -1,41 +1,48 @@
 # Session State
 
 - **Current Goal**: Zero-Code Function Observability Platform (EventsLog)
-- **Current Task**: TASK-038 (Local Mode Full-Stack End-to-End Simulation & Verification (Cross-System))
+- **Current Task**: TASK-039 (Full-Stack Audit Remediation & Comprehensive System Optimization)
 - **Current Status**: DONE
 - **Completed Work**:
-  - Implemented and fully verified TASK-038: Local Mode Full-Stack End-to-End Simulation & Verification.
-  - End-to-End Simulation Suite (`tests/e2e/src/local_mode_e2e.ts` & `scripts/run_local_mode_simulation.sh`):
-    - **Scenario 1 (Node.js SDK In-Process SQLite Mode)**: Verified an external project installing only `@eventslog/node` can execute with `-r @eventslog/node/register` in `EVENTSLOG_MODE=local`. Confirmed that arguments, return values, errors (`CardValidationError`), execution latencies, and distributed parent-child spans persist directly into SQLite with 0 background servers running. (100% PASSED)
-    - **Scenario 2 (Standalone Rust Local Service)**: Verified compilation and runtime of `eventslog-local` (`services/local`) on port 8999 with SQLite WAL engine. Ingested batches via `POST /v1/events` (HTTP 202) and verified query APIs (`/v1/functions`, `/v1/executions`, `/v1/traces/:id` with 2 child spans, `/v1/stats`). (100% PASSED)
-    - **Scenario 3 (Browser SDK In-Browser IndexedDB & DevTools)**: Verified in-browser telemetry persistence using `IndexedDB` (`eventslog_db`). Confirmed span aggregation, error capture, and client analytical queries (`listFunctions`, `getStats`). (100% PASSED)
-    - **Scenario 4 (Web Dashboard Multi-Provider Data Source)**: Verified `ProviderRegistry` dynamic initialization and switching across `remote` (ClickHouse), `local_sqlite` (Rust service), and `indexeddb` (in-browser IDB). (100% PASSED)
-  - Comprehensive Documentation Enhancement:
-    - Updated `README.md` with dedicated section on Local Storage Mode (Node.js in-process SQLite zero-config, Browser IndexedDB zero-server, standalone Rust local service, and Dashboard switching).
-    - Updated `docs/AI/ARCHITECTURE.md` with Section 25: Local Storage Mode Architecture (SQLite & IndexedDB).
-    - Updated `docs/AI/DECISIONS.md` with `DEC-007: Local Storage Mode Architecture (In-Process SQLite & In-Browser IndexedDB)`.
-    - Updated `docs/AI/tasks/TASK-038.md` and `docs/AI/TASK_INDEX.md` marking Milestone 14 as DONE.
-  - Comprehensive Tests & Verification:
-    - Executed `./scripts/run_local_mode_simulation.sh` -> 100% passed (Exit code 0).
-    - Executed `cargo test --workspace` -> 54 passed, 0 failed.
-    - Executed `pnpm -r --filter=!./tests/** run test` -> 106 passed, 0 failed.
-    - Executed `pnpm --filter dashboard test` -> 14 passed, 0 failed.
-    - Executed `pnpm --filter dashboard build` -> Vite production build success.
+  - Implemented and fully verified TASK-039: Full-Stack Audit Remediation & Comprehensive System Optimization across all layers.
+  - **E2E Simulation Build & Runtime Remediations**:
+    - Fixed `tests/e2e/src/index.ts`: added `mode: 'remote'` and `sqlite_path: './eventslog.db'` to `nodeConfig` to conform with `EventsLogConfig` interface.
+    - Fixed `tests/e2e/src/local_mode_e2e.ts`: updated import path to `'../../../dashboard/src/api/provider.js'` for NodeNext resolution compatibility.
+    - Verified `tsc` compilation via `pnpm --filter @eventslog/e2e-real-world build` (0 errors), emitting TypeScript decorator metadata required by NestJS runtime dependency injection.
+    - Executed `./scripts/run_real_world_e2e.sh`: all 6 end-to-end checks passed with 100% success (React checkout, Vue transitions, 25 parallel clients concurrency test, NestJS backend exceptions, ClickHouse zero-leak redaction of 1377 sensitive fields).
+    - Executed `./scripts/run_flutter_e2e.sh`: all 6 full-stack checks passed with 100% success (AST injection, Dart VM, Zone context propagation, clean restore with 0 Git diff).
+  - **Web Dashboard Usability & Dynamic Trace Navigation**:
+    - Updated `dashboard/src/App.tsx`: enhanced `onViewTrace` in `ExecutionDetailModal` to dynamically fetch the specific trace using `currentProvider.fetchTrace(traceId)` and switch to the traces view.
+    - Replaced brittle hardcoded trace ID fallback with dynamic auto-loading of the most recent trace from discovered function executions, and added a friendly empty-state UI when no trace is selected.
+  - **Browser SDK Memory Bounding & IndexedDB Pruning**:
+    - Updated `sdks/browser/src/transport/indexeddb.ts`: added `maxRecords` (default: 5,000) and implemented FIFO record pruning in `insertBatch()` via cursor iteration over the `timestamp` index. Prevents memory leaks and browser jank during prolonged sessions.
+  - **Full Workspace Test & Quality Verification**:
+    - `cargo test --workspace` -> 54 passed, 0 failed.
+    - `pnpm -r --filter=!./tests/** run test` -> 106 passed, 0 failed.
+    - `pnpm --filter dashboard test` -> 14 passed, 0 failed.
+    - `pnpm --filter dashboard build` -> Vite production build success.
+    - `./scripts/run_local_mode_simulation.sh` -> 4/4 scenarios passed (100%).
+    - `./scripts/run_real_world_e2e.sh` -> 6/6 checks passed (100%).
+    - `./scripts/run_flutter_e2e.sh` -> 6/6 checks passed (100%).
 - **Modified / Created Files**:
+  - `tests/e2e/src/index.ts`
   - `tests/e2e/src/local_mode_e2e.ts`
-  - `scripts/run_local_mode_simulation.sh`
-  - `README.md`
-  - `docs/AI/ARCHITECTURE.md`
-  - `docs/AI/DECISIONS.md`
-  - `docs/AI/tasks/TASK-038.md`
+  - `dashboard/src/App.tsx`
+  - `sdks/browser/src/transport/indexeddb.ts`
+  - `sdks/flutter/README.md`
+  - `sdks/flutter/MOBILE_SETUP_GUIDE.md`
+  - `docs/AI/tasks/TASK-039.md`
   - `docs/AI/TASK_INDEX.md`
   - `docs/AI/SESSION_STATE.md`
 - **Executed Verification Commands & Results**:
-  - `./scripts/run_local_mode_simulation.sh` -> 4/4 scenarios passed with 100% success
+  - `pnpm --filter @eventslog/e2e-real-world build` -> tsc build exit code 0
+  - `./scripts/run_real_world_e2e.sh` -> 100% passed
+  - `./scripts/run_flutter_e2e.sh` -> 100% passed
+  - `./scripts/run_local_mode_simulation.sh` -> 100% passed (4/4 scenarios)
   - `cargo test --workspace` -> 54 passed, 0 failed
   - `pnpm -r --filter=!./tests/** run test` -> 106 passed, 0 failed
   - `pnpm --filter dashboard test` -> 14 passed, 0 failed
-  - `pnpm --filter dashboard build` -> Build success (Vite v5.4.21, gzip: 56.22 kB)
+  - `pnpm --filter dashboard build` -> Vite build exit code 0
 - **Unresolved Issues**: None
 - **Risks & Assumptions**: None
-- **Next Task to Execute**: All planned Milestone 1 through 14 tasks are complete. Ready for final handover or user instructions.
+- **Next Task to Execute**: Ready for user instructions.
