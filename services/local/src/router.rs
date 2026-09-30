@@ -26,6 +26,7 @@ pub fn create_router(storage: SqliteStorage) -> Router {
     Router::new()
         .route("/health", get(health_check))
         .route("/v1/events", post(ingest_events))
+        .route("/v1/events/batch", post(ingest_events))
         .route("/v1/functions", get(list_functions))
         .route("/v1/functions/:id/executions", get(list_function_executions))
         .route("/v1/executions/:id", get(get_execution))

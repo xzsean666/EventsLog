@@ -7,6 +7,7 @@ export interface BackupManifest {
     relativePath: string;
     originalSize: number;
   }>;
+  createdFiles?: string[];
 }
 
 export class BackupManager {
@@ -20,11 +21,25 @@ export class BackupManager {
     this.manifest = {
       timestamp: new Date().toISOString(),
       files: [],
+      createdFiles: [],
     };
   }
 
   hasBackup(): boolean {
     return fs.existsSync(this.manifestPath);
+  }
+
+  /**
+   * Tracks a new file created by instrumentation (will be deleted on restore).
+   */
+  trackCreatedFile(relativeFilePath: string): void {
+    const rel = relativeFilePath.replace(/\\/g, '/');
+    if (!this.manifest.createdFiles) {
+      this.manifest.createdFiles = [];
+    }
+    if (!this.manifest.createdFiles.includes(rel)) {
+      this.manifest.createdFiles.push(rel);
+    }
   }
 
   /**
@@ -35,6 +50,10 @@ export class BackupManager {
     if (!fs.existsSync(srcPath)) return;
 
     const destPath = path.join(this.backupDir, relativeFilePath);
+    if (fs.existsSync(destPath)) {
+      // Pristine original already backed up; never overwrite!
+      return;
+    }
     fs.mkdirSync(path.dirname(destPath), { recursive: true });
 
     const content = fs.readFileSync(srcPath);
@@ -75,6 +94,16 @@ export class BackupManager {
           fs.mkdirSync(path.dirname(originalFilePath), { recursive: true });
           fs.copyFileSync(backupFilePath, originalFilePath);
           count++;
+        }
+      }
+
+      // Remove created files
+      if (manifest.createdFiles) {
+        for (const rel of manifest.createdFiles) {
+          const target = path.join(this.projectRoot, rel);
+          if (fs.existsSync(target)) {
+            fs.rmSync(target, { force: true });
+          }
         }
       }
 

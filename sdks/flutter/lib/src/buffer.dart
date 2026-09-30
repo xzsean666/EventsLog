@@ -12,6 +12,7 @@ class AutoBatchBuffer {
   Timer? _timer;
   bool _isFlushing = false;
   int _droppedCount = 0;
+  int _consecutiveFailures = 0;
 
   AutoBatchBuffer({
     required this.config,
@@ -28,7 +29,7 @@ class AutoBatchBuffer {
   /// Current number of buffered events.
   int get length => _queue.length;
 
-  /// Total number of events dropped due to buffer capacity overflow.
+  /// Total number of events dropped due to buffer capacity overflow or exhausted retries.
   int get droppedCount => _droppedCount;
 
   /// Enqueues an event into the batch buffer.
@@ -59,15 +60,39 @@ class AutoBatchBuffer {
 
     try {
       if (batch.isNotEmpty) {
-        await transport.sendBatch(batch);
+        final ok = await transport.sendBatch(batch);
+        if (ok) {
+          _consecutiveFailures = 0;
+        } else {
+          _handleFailure(batch);
+        }
       }
     } catch (_) {
-      // Fail-safe observability: never crash or throw unhandled exceptions
+      _handleFailure(batch);
     } finally {
       _isFlushing = false;
-      // If there are still events left, trigger another flush
-      if (_queue.isNotEmpty && _queue.length >= config.batchSize) {
+      // If there are still events left and we have not exceeded max retries, trigger another flush
+      if (_queue.isNotEmpty && _queue.length >= config.batchSize && _consecutiveFailures < config.maxRetryAttempts) {
         flush();
+      }
+    }
+  }
+
+  void _handleFailure(List<EventsLogEvent> batch) {
+    _consecutiveFailures++;
+    if (_consecutiveFailures <= config.maxRetryAttempts) {
+      _requeueBatch(batch);
+    } else {
+      _droppedCount += batch.length;
+    }
+  }
+
+  void _requeueBatch(List<EventsLogEvent> failedBatch) {
+    for (int i = failedBatch.length - 1; i >= 0; i--) {
+      if (_queue.length < config.maxQueueSize) {
+        _queue.addFirst(failedBatch[i]);
+      } else {
+        _droppedCount++;
       }
     }
   }
@@ -76,8 +101,15 @@ class AutoBatchBuffer {
   Future<void> close() async {
     _timer?.cancel();
     _timer = null;
-    while (_queue.isNotEmpty) {
-      await flush();
+    if (_queue.isNotEmpty) {
+      final batch = <EventsLogEvent>[];
+      while (_queue.isNotEmpty && batch.length < config.batchSize) {
+        batch.add(_queue.removeFirst());
+      }
+      try {
+        await transport.sendBatch(batch);
+      } catch (_) {}
+      _queue.clear();
     }
   }
 }

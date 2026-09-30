@@ -1,48 +1,59 @@
 # Session State
 
 - **Current Goal**: Zero-Code Function Observability Platform (EventsLog)
-- **Current Task**: TASK-039 (Full-Stack Audit Remediation & Comprehensive System Optimization)
+- **Current Task**: TASK-040 (Flutter SDK & Server-Side Full-Stack Comprehensive Optimization & Hardening)
 - **Current Status**: DONE
 - **Completed Work**:
-  - Implemented and fully verified TASK-039: Full-Stack Audit Remediation & Comprehensive System Optimization across all layers.
-  - **E2E Simulation Build & Runtime Remediations**:
-    - Fixed `tests/e2e/src/index.ts`: added `mode: 'remote'` and `sqlite_path: './eventslog.db'` to `nodeConfig` to conform with `EventsLogConfig` interface.
-    - Fixed `tests/e2e/src/local_mode_e2e.ts`: updated import path to `'../../../dashboard/src/api/provider.js'` for NodeNext resolution compatibility.
-    - Verified `tsc` compilation via `pnpm --filter @eventslog/e2e-real-world build` (0 errors), emitting TypeScript decorator metadata required by NestJS runtime dependency injection.
-    - Executed `./scripts/run_real_world_e2e.sh`: all 6 end-to-end checks passed with 100% success (React checkout, Vue transitions, 25 parallel clients concurrency test, NestJS backend exceptions, ClickHouse zero-leak redaction of 1377 sensitive fields).
-    - Executed `./scripts/run_flutter_e2e.sh`: all 6 full-stack checks passed with 100% success (AST injection, Dart VM, Zone context propagation, clean restore with 0 Git diff).
-  - **Web Dashboard Usability & Dynamic Trace Navigation**:
-    - Updated `dashboard/src/App.tsx`: enhanced `onViewTrace` in `ExecutionDetailModal` to dynamically fetch the specific trace using `currentProvider.fetchTrace(traceId)` and switch to the traces view.
-    - Replaced brittle hardcoded trace ID fallback with dynamic auto-loading of the most recent trace from discovered function executions, and added a friendly empty-state UI when no trace is selected.
-  - **Browser SDK Memory Bounding & IndexedDB Pruning**:
-    - Updated `sdks/browser/src/transport/indexeddb.ts`: added `maxRecords` (default: 5,000) and implemented FIFO record pruning in `insertBatch()` via cursor iteration over the `timestamp` index. Prevents memory leaks and browser jank during prolonged sessions.
+  - Implemented and fully verified TASK-040: Flutter SDK & Server-Side Full-Stack Comprehensive Optimization & Hardening.
+  - **Server-Side Routing Alignment (`eventslog-local`)**:
+    - Added `/v1/events/batch` route alias to `services/local/src/router.rs` matching `services/ingestion` and mobile setup conventions.
+    - Added `test_batch_endpoint_ingest` in `services/local/tests/local_service_test.rs`, verifying both `/v1/events` and `/v1/events/batch` accept batches (HTTP 202).
+  - **Flutter AST Transformer & CLI Engine Remediation**:
+    - Enhanced Dart AST parser in `sdks/flutter/src/transformer/parser.ts` to scan backwards across generic angle brackets (`<...>`) and nullable markers (`?`), accurately parsing generic return types like `Future<void>`, `Future<T>`, and `Map<K, V>?`.
+    - Fixed async void transformation in `sdks/flutter/src/transformer/rewriter.ts`: functions returning `Future<void>` or `Future<T>` retain `return EventsLog.runWithSpan(...)`, and `void` async functions use `await EventsLog.runWithSpan(...)`, eliminating detached fire-and-forget executions.
+    - Implemented automatic runtime configuration bridging in `sdks/flutter/src/cli.ts`: during `runInject`, generates `lib/.eventslog_bootstrap.g.dart` with settings from `eventslog.yaml` and auto-injects `ensureEventsLogConfigured()` into `main()`.
+    - Updated `BackupManager` in `sdks/flutter/src/backup/backup_manager.ts` to track generated files and delete them on restore, maintaining zero Git diff.
+  - **Flutter Client SDK Mobile Hardening & Observability Ergonomics**:
+    - Implemented `EventSanitizer` in `sdks/flutter/lib/src/sanitizer.dart`: recursive sanitization with case-insensitive `sensitive_keys` masking (`password`, `token`, `secret`, `authorization`, `credit_card`, `cvv`, etc.), depth limiting (6), cycle detection, and fallback string conversion.
+    - Integrated `EventSanitizer` into `EventsLogSpan` in `sdks/flutter/lib/src/span.dart` for both `arguments` (inputs) and `output` (returns).
+    - Upgraded `AutoBatchBuffer` in `sdks/flutter/lib/src/buffer.dart` with network failure resilience: retries failed batches up to `maxRetryAttempts` (default: 3) instead of dropping immediately, and ensures non-blocking, clean termination during `close()`.
+    - Added `EventsLog.getTraceHeaders()` in `sdks/flutter/lib/eventslog.dart` generating W3C `traceparent` and platform headers for Dio / HTTP client context propagation across mobile and backend.
   - **Full Workspace Test & Quality Verification**:
-    - `cargo test --workspace` -> 54 passed, 0 failed.
-    - `pnpm -r --filter=!./tests/** run test` -> 106 passed, 0 failed.
+    - `cargo test --workspace` -> 55 passed, 0 failed.
+    - `pnpm -r --filter=!./tests/** run test` -> 107 passed, 0 failed.
+    - `pnpm --filter @eventslog/flutter run test` -> 15 passed, 0 failed.
+    - `dart test` (sdks/flutter) -> 8 passed, 0 failed.
     - `pnpm --filter dashboard test` -> 14 passed, 0 failed.
-    - `pnpm --filter dashboard build` -> Vite production build success.
-    - `./scripts/run_local_mode_simulation.sh` -> 4/4 scenarios passed (100%).
-    - `./scripts/run_real_world_e2e.sh` -> 6/6 checks passed (100%).
     - `./scripts/run_flutter_e2e.sh` -> 6/6 checks passed (100%).
+    - `./scripts/run_local_mode_simulation.sh` -> 4/4 scenarios passed (100%).
 - **Modified / Created Files**:
-  - `tests/e2e/src/index.ts`
-  - `tests/e2e/src/local_mode_e2e.ts`
-  - `dashboard/src/App.tsx`
-  - `sdks/browser/src/transport/indexeddb.ts`
-  - `sdks/flutter/README.md`
-  - `sdks/flutter/MOBILE_SETUP_GUIDE.md`
-  - `docs/AI/tasks/TASK-039.md`
+  - `services/local/src/router.rs`
+  - `services/local/tests/local_service_test.rs`
+  - `sdks/flutter/lib/src/config.dart`
+  - `sdks/flutter/lib/src/sanitizer.dart`
+  - `sdks/flutter/lib/src/span.dart`
+  - `sdks/flutter/lib/src/buffer.dart`
+  - `sdks/flutter/lib/eventslog.dart`
+  - `sdks/flutter/src/backup/backup_manager.ts`
+  - `sdks/flutter/src/cli.ts`
+  - `sdks/flutter/src/transformer/parser.ts`
+  - `sdks/flutter/src/transformer/rewriter.ts`
+  - `sdks/flutter/test/transformer.test.ts`
+  - `sdks/flutter/test/sanitizer_test.dart`
+  - `sdks/flutter/test/runtime_test.dart`
+  - `docs/AI/tasks/TASK-040.md`
   - `docs/AI/TASK_INDEX.md`
   - `docs/AI/SESSION_STATE.md`
 - **Executed Verification Commands & Results**:
-  - `pnpm --filter @eventslog/e2e-real-world build` -> tsc build exit code 0
-  - `./scripts/run_real_world_e2e.sh` -> 100% passed
-  - `./scripts/run_flutter_e2e.sh` -> 100% passed
+  - `cargo test -p eventslog-local` -> 7 passed, 0 failed
+  - `pnpm --filter @eventslog/flutter run build` -> exit code 0
+  - `pnpm --filter @eventslog/flutter run test` -> 15 passed, 0 failed
+  - `cd sdks/flutter && dart test` -> 8 passed, 0 failed
+  - `./scripts/run_flutter_e2e.sh` -> 100% passed (6/6 checks)
   - `./scripts/run_local_mode_simulation.sh` -> 100% passed (4/4 scenarios)
-  - `cargo test --workspace` -> 54 passed, 0 failed
-  - `pnpm -r --filter=!./tests/** run test` -> 106 passed, 0 failed
+  - `cargo test --workspace` -> 55 passed, 0 failed
+  - `pnpm -r --filter=!./tests/** run test` -> 107 passed, 0 failed
   - `pnpm --filter dashboard test` -> 14 passed, 0 failed
-  - `pnpm --filter dashboard build` -> Vite build exit code 0
 - **Unresolved Issues**: None
 - **Risks & Assumptions**: None
 - **Next Task to Execute**: Ready for user instructions.

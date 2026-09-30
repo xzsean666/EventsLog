@@ -288,10 +288,33 @@ export function parseDartSource(source: string): DartFunction[] {
       let returnType: string | undefined = undefined;
       let startOffset = nameTok.offset;
 
-      if (prev2 && prev2.type === 'word') {
-        // Could be return type e.g. Future<Order> or void
-        returnType = prev2.value;
-        startOffset = prev2.offset;
+      let typeEndIdx = i - 2;
+      let hasNullable = false;
+      if (typeEndIdx >= 0 && codeTokens[typeEndIdx].value === '?') {
+        hasNullable = true;
+        typeEndIdx--;
+      }
+
+      if (typeEndIdx >= 0 && codeTokens[typeEndIdx].value === '>') {
+        let angleDepth = 1;
+        let k = typeEndIdx - 1;
+        while (k >= 0 && angleDepth > 0) {
+          if (codeTokens[k].value === '>') angleDepth++;
+          else if (codeTokens[k].value === '<') angleDepth--;
+          k--;
+        }
+        if (angleDepth === 0 && k >= 0 && codeTokens[k].type === 'word') {
+          const typeStartTok = codeTokens[k];
+          const rawType = source.slice(typeStartTok.offset, codeTokens[typeEndIdx].offset + 1).trim();
+          returnType = hasNullable ? `${rawType}?` : rawType;
+          startOffset = typeStartTok.offset;
+        }
+      } else if (typeEndIdx >= 0 && codeTokens[typeEndIdx].type === 'word') {
+        const word = codeTokens[typeEndIdx].value;
+        if (word !== 'static' && word !== 'external' && word !== 'abstract') {
+          returnType = hasNullable ? `${word}?` : word;
+          startOffset = codeTokens[typeEndIdx].offset;
+        }
       }
 
       // Find closing ')'

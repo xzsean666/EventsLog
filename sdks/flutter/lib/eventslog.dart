@@ -1,11 +1,10 @@
-library eventslog;
-
 import 'src/config.dart';
 import 'src/models.dart';
 import 'src/zone.dart';
 import 'src/span.dart';
 import 'src/buffer.dart';
 import 'src/transport.dart';
+import 'src/sanitizer.dart';
 
 export 'src/config.dart';
 export 'src/models.dart';
@@ -13,9 +12,11 @@ export 'src/zone.dart';
 export 'src/span.dart';
 export 'src/buffer.dart';
 export 'src/transport.dart';
+export 'src/sanitizer.dart';
 
 /// Primary singleton interface for the EventsLog Flutter/Dart Observability SDK.
 class EventsLog {
+  static EventsLogConfig? defaultConfig;
   static EventsLogConfig _config = const EventsLogConfig(serviceName: 'flutter-app');
   static HttpTransport? _transport;
   static AutoBatchBuffer? _buffer;
@@ -25,6 +26,8 @@ class EventsLog {
   static void init([EventsLogConfig? config]) {
     if (config != null) {
       _config = config;
+    } else if (defaultConfig != null) {
+      _config = defaultConfig!;
     }
     _transport?.close();
     _buffer?.close();
@@ -46,6 +49,25 @@ class EventsLog {
   /// Returns the current active span ID from the async Zone hierarchy.
   static String? get currentSpanId => EventsLogZone.currentSpanId;
 
+  /// Returns distributed tracing HTTP headers (W3C traceparent and EventsLog headers).
+  ///
+  /// Can be merged into Dio or http client request headers to propagate trace context
+  /// from the mobile application to backend services.
+  static Map<String, String> getTraceHeaders() {
+    final traceId = currentTraceId;
+    final spanId = currentSpanId;
+    if (traceId == null || spanId == null) {
+      return const {};
+    }
+    final normalizedTrace = traceId.padLeft(32, '0');
+    final normalizedSpan = spanId.padLeft(16, '0');
+    return {
+      'traceparent': '00-$normalizedTrace-$normalizedSpan-01',
+      'x-eventslog-trace-id': traceId,
+      'x-eventslog-span-id': spanId,
+    };
+  }
+
   /// Starts a new function execution span.
   ///
   /// If invoked within an existing trace context, the span automatically links to
@@ -59,7 +81,7 @@ class EventsLog {
     Map<String, dynamic>? arguments,
   }) {
     if (!_initialized) {
-      init();
+      init(defaultConfig);
     }
 
     final parentSpanId = EventsLogZone.currentSpanId;

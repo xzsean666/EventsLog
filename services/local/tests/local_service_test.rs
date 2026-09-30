@@ -104,6 +104,38 @@ async fn test_empty_ingest_rejection() {
 }
 
 #[tokio::test]
+async fn test_batch_endpoint_ingest() {
+    let storage = SqliteStorage::open_in_memory().unwrap();
+    let app = create_router(storage);
+
+    let event = build_test_event(
+        "00000000-0000-0000-0000-000000000009",
+        "trace-109",
+        "span-109",
+        None,
+        "mobile-service",
+        "checkout",
+        "pay",
+        ExecutionStatus::Success,
+        45.0,
+    );
+
+    let payload = serde_json::json!({
+        "events": [event]
+    });
+
+    let req = Request::builder()
+        .uri("/v1/events/batch")
+        .method("POST")
+        .header("Content-Type", "application/json")
+        .body(Body::from(serde_json::to_string(&payload).unwrap()))
+        .unwrap();
+
+    let res = app.oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::ACCEPTED);
+}
+
+#[tokio::test]
 async fn test_bare_array_and_single_event_ingest() {
     let storage = SqliteStorage::open_in_memory().unwrap();
     let app = create_router(storage);

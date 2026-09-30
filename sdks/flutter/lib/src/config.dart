@@ -27,6 +27,15 @@ class EventsLogConfig {
   /// Optional HTTP headers (e.g. Authorization tokens) sent with ingestion requests.
   final Map<String, String>? headers;
 
+  /// Sensitive key patterns masked automatically in arguments and return values.
+  final List<String>? sensitiveKeys;
+
+  /// Maximum number of retry attempts for failed batches before safe disposal.
+  final int maxRetryAttempts;
+
+  /// Initial retry backoff interval in milliseconds.
+  final int retryDelayMs;
+
   const EventsLogConfig({
     required this.serviceName,
     this.environment = 'production',
@@ -37,6 +46,9 @@ class EventsLogConfig {
     this.captureArguments = true,
     this.captureReturns = true,
     this.headers,
+    this.sensitiveKeys,
+    this.maxRetryAttempts = 3,
+    this.retryDelayMs = 500,
   });
 
   factory EventsLogConfig.fromJson(Map<String, dynamic> json) {
@@ -52,6 +64,9 @@ class EventsLogConfig {
       headers: (json['headers'] as Map<String, dynamic>?)?.map(
         (k, v) => MapEntry(k, v.toString()),
       ),
+      sensitiveKeys: (json['sensitive_keys'] as List<dynamic>?)?.map((e) => e.toString()).toList(),
+      maxRetryAttempts: (json['max_retry_attempts'] as num?)?.toInt() ?? 3,
+      retryDelayMs: (json['retry_delay_ms'] as num?)?.toInt() ?? 500,
     );
   }
 }

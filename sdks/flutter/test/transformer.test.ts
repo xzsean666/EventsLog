@@ -117,4 +117,47 @@ class OrderService {
     expect(result.code).toBe(source);
     expect(result.instrumentedFunctions.length).toBe(0);
   });
+
+  it('correctly handles Future<void> async, void async, and sync void functions', () => {
+    const source = `
+class AsyncService {
+  Future<void> saveUser(String id) async {
+    await db.save(id);
+  }
+
+  void fireAndForget(String id) async {
+    await notify(id);
+  }
+
+  void syncLog(String msg) {
+    print(msg);
+  }
+}
+`;
+    const matcher = new PatternMatcher(['lib/**'], []);
+    const result = transformDartSource(source, 'lib/async.dart', mockConfig, matcher);
+
+    expect(result.modified).toBe(true);
+    // Future<void> async must RETURN the span future
+    expect(result.code).toContain("return EventsLog.runWithSpan(\n      functionName: 'AsyncService.saveUser'");
+    // void async must AWAIT the span future
+    expect(result.code).toContain("await EventsLog.runWithSpan(\n      functionName: 'AsyncService.fireAndForget'");
+    // void sync must NOT have return or await
+    expect(result.code).toMatch(/syncLog\([^)]*\)\s*\{\s*EventsLog\.runWithSpan/);
+  });
+
+  it('correctly parses generic return types', () => {
+    const source = `
+class Repo {
+  Future<Map<String, dynamic>> fetchJson() async => {};
+  Future<void> flush() async {}
+  List<String>? getItems() => null;
+}
+`;
+    const fns = parseDartSource(source);
+    expect(fns.length).toBe(3);
+    expect(fns[0].returnType).toBe('Future<Map<String, dynamic>>');
+    expect(fns[1].returnType).toBe('Future<void>');
+    expect(fns[2].returnType).toBe('List<String>?');
+  });
 });

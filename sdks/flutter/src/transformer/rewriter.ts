@@ -96,12 +96,15 @@ export function transformDartSource(
     } else {
       // Block body { ... }
       const innerContent = fn.bodyContent.slice(1, -1);
-      const isVoidType = fn.returnType === 'void' || fn.returnType === 'Future<void>';
 
       if (fn.isAsync) {
-        const returnPrefix = isVoidType ? '' : 'return ';
+        // In Dart, an async function with return type 'void' cannot return an expression,
+        // but it CAN and SHOULD 'await' the span execution so it does not run detached.
+        // Functions with 'Future<void>', 'Future<T>', or dynamic CAN return the Future.
+        const isSyncVoid = fn.returnType === 'void';
+        const prefix = isSyncVoid ? 'await ' : 'return ';
         replacement = `{\n` +
-          `${bodyIndent}${returnPrefix}EventsLog.runWithSpan(\n` +
+          `${bodyIndent}${prefix}EventsLog.runWithSpan(\n` +
           `${bodyIndent}  functionName: '${fullName}',\n` +
           `${bodyIndent}  className: ${classArg},\n` +
           `${bodyIndent}  filePath: ${filePathArg},\n` +
@@ -113,9 +116,10 @@ export function transformDartSource(
           `${indent}}`;
 
       } else {
-        const returnPrefix = isVoidType ? '' : 'return ';
+        const isSyncVoid = fn.returnType === 'void';
+        const prefix = isSyncVoid ? '' : 'return ';
         replacement = `{\n` +
-          `${bodyIndent}${returnPrefix}EventsLog.runWithSpan(\n` +
+          `${bodyIndent}${prefix}EventsLog.runWithSpan(\n` +
           `${bodyIndent}  functionName: '${fullName}',\n` +
           `${bodyIndent}  className: ${classArg},\n` +
           `${bodyIndent}  filePath: ${filePathArg},\n` +

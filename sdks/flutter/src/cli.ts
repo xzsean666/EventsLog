@@ -58,6 +58,54 @@ export function runInject(projectDir?: string, configPath?: string): { filesModi
   }
 
   if (filesModified > 0) {
+    const libDir = path.join(config.projectRoot, 'lib');
+    if (fs.existsSync(libDir)) {
+      const bootstrapRel = 'lib/.eventslog_bootstrap.g.dart';
+      const bootstrapAbs = path.join(config.projectRoot, bootstrapRel);
+      const headersStr = config.headers ? JSON.stringify(config.headers) : 'null';
+      const bootstrapCode = `// @eventslog:generated
+// Auto-generated configuration bootstrap by EventsLog CLI. Do not commit.
+import 'package:eventslog_flutter/eventslog.dart';
+
+const EventsLogConfig kEventsLogAutoConfig = EventsLogConfig(
+  serviceName: '${config.serviceName}',
+  environment: '${config.environment}',
+  endpoint: '${config.endpoint}',
+  batchSize: ${config.batchSize},
+  flushIntervalMs: ${config.flushIntervalMs},
+  maxQueueSize: ${config.maxQueueSize},
+  captureArguments: ${config.captureArguments},
+  captureReturns: ${config.captureReturns},
+  headers: ${headersStr},
+);
+
+/// Auto-registers default configuration at app startup.
+void ensureEventsLogConfigured() {
+  EventsLog.defaultConfig = kEventsLogAutoConfig;
+  if (!EventsLog.isInitialized) {
+    EventsLog.init(kEventsLogAutoConfig);
+  }
+}
+`;
+      fs.writeFileSync(bootstrapAbs, bootstrapCode, 'utf8');
+      backupManager.trackCreatedFile(bootstrapRel);
+
+      const mainAbs = path.join(config.projectRoot, 'lib/main.dart');
+      if (fs.existsSync(mainAbs)) {
+        const mainSource = fs.readFileSync(mainAbs, 'utf8');
+        if (!mainSource.includes('ensureEventsLogConfigured') && !mainSource.includes('.eventslog_bootstrap.g.dart')) {
+          const mainRegex = /((?:void|Future<void>)?\s*main\s*\([^)]*\)\s*(?:async)?\s*\{)/;
+          if (mainRegex.test(mainSource)) {
+            backupManager.backupFile('lib/main.dart');
+            let newMain = `import '.eventslog_bootstrap.g.dart';\n` + mainSource;
+            newMain = newMain.replace(mainRegex, '$1\n  ensureEventsLogConfigured();');
+            fs.writeFileSync(mainAbs, newMain, 'utf8');
+            console.log('[EventsLog] Injected runtime auto-configuration hook into lib/main.dart');
+          }
+        }
+      }
+    }
+
     backupManager.saveManifest();
     console.log(`[EventsLog] Successfully instrumented ${filesModified} files (${functionsCount} functions).`);
     console.log(`[EventsLog] Original sources backed up to .eventslog_backup/`);
